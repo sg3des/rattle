@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -21,26 +20,35 @@ func main() {
 
 func server() error {
 	http.Handle("/", http.FileServer(http.Dir(".")))
+	http.Handle("/rattle/", http.StripPrefix("/rattle/", http.FileServer(http.Dir("../"))))
 
+	//set debug mode
 	rattle.Debug = true
-	ws := rattle.SetControllers(&Main{})
-	http.Handle("/ws", ws)
+
+	//bind controllers and get handler
+	wshandle := rattle.SetControllers(&Main{})
+	http.Handle("/ws", wshandle)
 
 	return http.ListenAndServe("127.0.0.1:8080", nil)
 }
 
+//Main controller, into fields parse JSON requests
 type Main struct {
 	Name string
 	Text string
 }
 
+//Index is method of controller Main on request takes incoming message and possible returne answer message
 func (c *Main) Index(r *rattle.Message) *rattle.Message {
-	fmt.Println(c)
+
+	//just send message - insert data to h1 field
 	r.NewMessage("#h1", []byte(`Main Index`)).Send()
 
+	//returned message call test.Recieve Frontend function with JSON data
 	return r.NewMessage("test.Recieve", []byte(`{"newJSONkey":"`+c.Text+`"}`))
 }
 
+//Timer is periodic send data
 func (c *Main) Timer(r *rattle.Message) {
 	for {
 		time.Sleep(time.Second)

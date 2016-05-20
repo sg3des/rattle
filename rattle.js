@@ -130,10 +130,6 @@
 			},
 
 			send: function (msg) {
-				if (msg["To"] == undefined || msg["To"] == "") {
-					console.warn("rattle: field 'To'(target function) is not filled")
-					return
-				}
 
 				if (msg["From"] == undefined) {
 					msg["From"] == getCallerFunc();
