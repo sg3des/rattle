@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<script type="text/javascript" src="/wsrpc.js"></script>
-		<script type="text/javascript" src="/script.js"></script>
+		<script defer type="text/javascript" src="/rattle.js"></script>
+		<script defer type="text/javascript" src="/script.js"></script>
 	</head>
 	<body>
+		open console for view debug messages
+		<h1></h1>
+		<div id='timer'></div>
 		<input type="text" id="text">
-		<input type="button" id="send" onclick="test.Send()">
+		<input type="button" id="send" onclick="test.Send()" value='click me'>
 		<div id='msgs'></div>
+		<div id='somefield'></div>
 	</body>
 </html>
