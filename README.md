@@ -98,3 +98,9 @@ In order to send request/message:
 ```
 
 !NOTICE: Field "From" is likely for reference, Rattle autofill field "From", but for constructors this will be incorrect, in this case you can manually fill this field, or just ignore it.
+
+
+## TODO:
+
+	* need tests for frontend
+	* and many more other - this is yet a concept!
