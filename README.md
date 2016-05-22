@@ -1,22 +1,35 @@
-#RATTLE
+# RATTLE
 
 ### Rattle is websocket double-sided rpc solution - designed for create MVVM web applications.
 
-### WARNING: Rattle is only concept!
+#### WARNING: Rattle is only concept!
+
+## INSTALL
+
+	go get github.com/sg3des/rattle
+
+run example:
+
+	go run $GOPATH/src/github.com/sg3des/rattle/example/example.go
+
+web server will be listen at `127.0.0.1:8080`
+
+
+## IDEA
 
 MVC architecture with http requests not always suitable for web applications! 
 MVVM architecture more suitable for this, but design it on http requests a bit embarrassing, then need use websockets! 
 
 Rattle is tiny websocket double-sided framework. Backend is go, Frontend - javascript.
 
-	* For connections use websockets;
-	* Requests can come from backend and frontend at the same time: 
-		* From Backend possible call any Frontend(js) functions and pass arguments.
-		* From Backend possible directly insert data to any html element.
-		* From Frontend possible call any public methods of declare controllers.
+* For connections use websockets;
+* Requests can come from backend and frontend at the same time: 
+	* From Backend possible call any Frontend(js) functions and pass arguments.
+	* From Backend possible directly insert data to any html element.
+	* From Frontend possible call any public methods of declare controllers.
 
 
-### USAGE:
+## USAGE
 
 #### Backend:
 
