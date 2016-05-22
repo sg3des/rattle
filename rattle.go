@@ -17,34 +17,33 @@ import (
 )
 
 var (
-	c = &Controllers{make(map[string]interface{})}
-	// conn  *websocket.Conn
+	//Debug mode enable error output
 	Debug bool
+	//Connections map contains all available web socket connections
+	Connections = make(map[*websocket.Conn]bool)
+	//Controllers contains name and interface link on controller
+	Controllers = make(map[string]interface{})
 )
 
-//Controllers type
-type Controllers struct {
-	C map[string]interface{}
-}
-
 //SetControllers bind controllers
-func SetControllers(cons ...interface{}) http.Handler {
-	for _, con := range cons {
-		name := getControllerName(con)
-		c.C[name] = con
+func SetControllers(userContollers ...interface{}) http.Handler {
+	for _, c := range userContollers {
+		Controllers[getControllerName(c)] = c
 	}
+
 	return websocket.Handler(WSHandler)
 }
 
+//getControllerName determine name of struct through reflect
 func getControllerName(c interface{}) string {
 	constring := reflect.ValueOf(c).String()
 	f := regexp.MustCompile("\\.([A-Za-z0-9]+) ").FindString(constring)
-	f = strings.Trim(f, ". ")
-	return f
+	return strings.Trim(f, ". ")
 }
 
 //WSHandler is handler for websocket connections
 func WSHandler(ws *websocket.Conn) {
+	Connections[ws] = true
 	scanner := bufio.NewScanner(ws)
 
 	for scanner.Scan() && ws != nil {
@@ -52,15 +51,15 @@ func WSHandler(ws *websocket.Conn) {
 	}
 }
 
-// type Connection struct {
-// 	WS *websocket.Conn
-// }
-
+//Request is main function, takes connection and raw incoming message
+//  1) parse message
+//  2) call specified method of controller
+//  3) and if a answer is returned, then write it to connection
 func Request(ws *websocket.Conn, bmsg []byte) {
 	msg, err := Parsemsg(bmsg)
 	if err != nil {
 		if Debug {
-			log.Println(err, "incoming msg:", string(bmsg))
+			log.Println(err, "rattle incoming msg:", string(bmsg))
 		}
 		return
 	}
@@ -69,21 +68,26 @@ func Request(ws *websocket.Conn, bmsg []byte) {
 	answer, err := msg.Call()
 	if err != nil {
 		if Debug {
-			log.Println(err, "incoming msg:", string(bmsg))
+			log.Println(err, "rattle incoming msg:", string(bmsg))
 		}
 		return
 	}
 	if answer != nil {
 		if err := answer.Send(); err != nil {
 			if Debug {
-				log.Println(err, "incoming msg:", string(bmsg))
+				log.Println(err, "rattle incoming msg:", string(bmsg))
 			}
+
 			ws.Close()
+			delete(Connections, ws)
 		}
 	}
 }
 
-//Message type: fields From and To RPCMethod type and Data []byte type with payload in json format
+//Message type:
+//  From - name of calling function, autofill, can not be empty.
+//  To - contains name of called function, must be filled!
+//  Data may contains payload in json format - for backend, or json,html or another for frontend, not necessary.
 type Message struct {
 	WS   *websocket.Conn
 	From []byte
@@ -98,9 +102,9 @@ type RPCMethod struct {
 }
 
 //NewRPCMethod simple wrapper returned RCPMethod from strings
-func NewRPCMethod(controller, method string) RPCMethod {
-	return RPCMethod{controller, method}
-}
+// func NewRPCMethod(controller, method string) RPCMethod {
+// 	return RPCMethod{controller, method}
+// }
 
 //Parsemsg parse []byte message to type Message
 func Parsemsg(msg []byte) (*Message, error) {
@@ -139,19 +143,18 @@ func (rpc *RPCMethod) Join() []byte {
 
 //Call method by name
 func (r *Message) Call() (*Message, error) {
-	var icontoller interface{}
-	var ok bool
-
 	rpc, err := splitRPC(r.To)
 	if err != nil {
 		return nil, err
 	}
 
-	if icontoller, ok = c.C[rpc.Controller]; !ok {
+	var conInterface interface{}
+	var ok bool
+	if conInterface, ok = Controllers[rpc.Controller]; !ok {
 		return nil, errors.New("404 page not found")
 	}
 
-	controller := reflect.ValueOf(icontoller)
+	controller := reflect.ValueOf(conInterface)
 	method := controller.MethodByName(rpc.Method)
 	if !method.IsValid() {
 		return nil, errors.New("404 page not found")
@@ -182,12 +185,16 @@ func (r *Message) Bytes() []byte {
 
 	msg = append(msg, r.From)
 	msg = append(msg, r.To)
+
+	if !regexp.MustCompile("\n$").Match(r.Data) {
+		r.Data = append(r.Data, []byte("\n")...)
+	}
 	msg = append(msg, r.Data)
-	msg = append(msg, []byte("\n"))
 
 	return bytes.Join(msg, []byte(" "))
 }
 
+//NewMessage create answer message
 func (r *Message) NewMessage(to string, data ...[]byte) *Message {
 	msg := &Message{}
 	msg.WS = r.WS
@@ -203,6 +210,7 @@ func (r *Message) NewMessage(to string, data ...[]byte) *Message {
 	return msg
 }
 
+//Send message to connection
 func (r *Message) Send() error {
 	_, err := r.WS.Write(r.Bytes())
 	return err
@@ -218,10 +226,22 @@ func getFrom() []byte {
 
 	fs := strings.Split(funcname, ".")
 	if len(fs) != 3 {
-		panic(errors.New("failed get the caller function: " + f.Name()))
+		if Debug {
+			log.Println("rattle warning: failed get the caller function: " + f.Name())
+		}
+		return []byte("empty")
 	}
 
 	controller := regexp.MustCompile("[\\(\\)\\*]").ReplaceAllString(fs[1], "")
 
 	return []byte(fmt.Sprintf("%s.%s", controller, fs[2]))
+}
+
+//Broadcast send one message for all available connections(users)
+func (r *Message) Broadcast() {
+	for conn := range Connections {
+		if conn != nil {
+			conn.Write(r.Bytes())
+		}
+	}
 }

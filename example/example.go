@@ -1,24 +1,13 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/sg3des/rattle"
 )
 
-func init() {
-	log.SetFlags(log.Lshortfile)
-}
-
 func main() {
-	if err := server(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func server() error {
 	http.Handle("/", http.FileServer(http.Dir(".")))
 	http.Handle("/rattle/", http.StripPrefix("/rattle/", http.FileServer(http.Dir("../"))))
 
@@ -29,18 +18,19 @@ func server() error {
 	wshandle := rattle.SetControllers(&Main{})
 	http.Handle("/ws", wshandle)
 
-	return http.ListenAndServe("127.0.0.1:8080", nil)
+	println("web server listen on 127.0.0.1:8080")
+	http.ListenAndServe("127.0.0.1:8080", nil)
 }
 
 //Main controller, into fields parse JSON requests
+//!in real project controller will be located in another package
 type Main struct {
 	Name string
 	Text string
 }
 
-//Index is method of controller Main on request takes incoming message and possible returne answer message
+//Index is method of controller Main on request takes incoming message and possible return answer message
 func (c *Main) Index(r *rattle.Message) *rattle.Message {
-
 	//just send message - insert data to h1 field
 	r.NewMessage("#h1", []byte(`Main Index`)).Send()
 
@@ -53,13 +43,15 @@ func (c *Main) Timer(r *rattle.Message) {
 	for {
 		time.Sleep(time.Second)
 		t := time.Now().Local().Format("2006.01.02 15:04:05")
-		err := r.NewMessage("#timer", []byte(t)).Send()
-		if err != nil {
+
+		if err := r.NewMessage("#timer", []byte(t)).Send(); err != nil {
+			//if err then connection is closed
 			return
 		}
 	}
 }
 
+//Something is just one more method
 func (c *Main) Something(r *rattle.Message) *rattle.Message {
 	tpldata := []byte(`<a href='https://github.com/sg3des/rattle'>rattle link</a>`)
 
