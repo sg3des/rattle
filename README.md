@@ -40,9 +40,9 @@ First need set controllers, and add http requests handler:
 	http.Handle("/ws", wshandle)
 ```
 Where: 
-* `&Main{}` is *link* on your controller
-* in real porject, recommended located controllers in another package, then *link* may be the: `&controllers.Main{}`
-* may to specify many controllers: `rattle.SetControllers(&Main{},&Second{},&Third{})`
+* `&Main{}` is *link* on your controller;
+* in real porject, recommended located controllers in another package, then *link* may be the: `&controllers.Main{}`;
+* may to specify many controllers: `rattle.SetControllers(&Main{},&Second{},&Third{})`.
 
 
 Write controller:
@@ -64,14 +64,13 @@ func (c *Main) Index(r *rattle.Message) *rattle.Message {
 }
 
 ```
-* Methods always takes incoming messages, and can(not necessary) return response.
+* Methods always takes incoming messages, and can(not necessary) return response;
 * based on an incoming message, you can create an answer: `r.NewMessage(to,data)`, where:
-	* first argument is can the name of the called frontend function, or if it starts with symbols `#`, `+` or `.` - target HTML element
-	!NOTICE: symbol selector is not fully CSS compatible! 
+	* first argument is can the name of the called frontend function, or if it starts with symbols `#`, `+` or `.` - target HTML element (**!NOTICE: symbol selector is not fully CSS compatible!**), that means: 
 		* `#` - crop first symbol, then search element by id, or if it not found search with querySelector, after this place data into element;
-		* `+` - crop first symbol, then search with query selector, and then adds the html data to the existing in element
-		* `.` - just search with query selector, and then place the data into this element
-	* second argument is data in []byte format, and may be type JSON, HTMl, etc...
+		* `+` - crop first symbol, then search with query selector, and then adds the html data to the existing in element;
+		* `.` - just search with query selector, and then place the data into this element.
+	* second argument is data in []byte format, and may be type JSON, HTML, etc...
 
 
 Strucutre of message:
@@ -83,23 +82,23 @@ type Message struct {
 	Data []byte
 }
 ```
-* **WS** field contains current websocket connection - does not require user action
-* **From** field is name of function which send request - rattle autofill this field
-* **To** field contain name of the called function - is required to fill by user
+* **WS** field contains current websocket connection - does not require user action;
+* **From** field is name of function which send request - rattle autofill this field;
+* **To** field contain name of the called function - is required to fill by user;
 * **Data** field: 
-	* for messages from **backend** to **frontend** can contain any type of data: HTML, JSON, etc
-	* for messages from **frontend** to **backend** always JSON
+	* for messages from **backend** to **frontend** can contain any type of data: HTML, JSON, etc;
+	* for messages from **frontend** to **backend** always JSON.
 
 
 
 
 #### Frontend:
-First need connect to server/backend
+First need connect to server/backend:
 
 ```
 	var conn = new rattle.NewConnection("ws://127.0.0.1:8080/ws", true);
 ```
-* second boolean argument is enable/disable debug mode
+* second boolean argument is enable/disable debug mode.
 
 Possible bind some custom actions for events, in the next example bind event *open*. 
 ```
@@ -142,5 +141,5 @@ var test = new constructorExample()
 
 ## TODO:
 
-	* need tests for frontend
-	* and many more other - this is yet a concept!
+* need tests for frontend;
+* and many more other - this is yet a concept!
