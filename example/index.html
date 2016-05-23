@@ -3,11 +3,19 @@
 	<head>
 		<script type="text/javascript" src="/rattle/rattle.js"></script>
 		<script defer type="text/javascript" src="/script.js"></script>
+		<style type="text/css">
+			body{ text-align: center; font-size: 120%; margin:0;}
+			*{color:#333;}
+			h1{width:100%; font-size: 300%; padding-top: 10%; margin: 0; background: rgba(90,90,90,.3);}
+			#quote{padding-left: 10%; font-size: 80%; font-style: italic; background: rgba(90,90,90,.6); margin-bottom: 2%;}
+		</style>
 	</head>
 	<body>
-		open console for view debug messages
-		<h1></h1>
-		<div id='timer'></div>
+		
+		<h1>RATTLE</h1>
+		<div id='quote'>*open console for view debug messages</div>
+
+		<div>Just clock, updated from backend: <span id="timer"></span></div>
 		<input type="text" id="text">
 		<input type="button" id="send" onclick="test.Send()" value='click me'>
 		<div id='msgs'></div>
