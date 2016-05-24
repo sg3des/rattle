@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/sg3des/rattle.svg?branch=master)](https://travis-ci.org/sg3des/rattle)
+
 # RATTLE
 
 ### Rattle is websocket double-sided rpc solution - designed for create MVVM web applications.
