@@ -78,13 +78,11 @@ Strucutre of message:
 ```
 type Message struct {
 	WS   *websocket.Conn
-	From []byte
 	To   []byte
 	Data []byte
 }
 ```
 * **WS** field contains current websocket connection - does not require user action;
-* **From** field is name of function which send request - rattle autofill this field;
 * **To** field contain name of the called function - is required to fill by user;
 * **Data** field: 
 	* for messages from **backend** to **frontend** can contain any type of data: HTML, JSON, etc;
@@ -116,7 +114,6 @@ In order to send request/message:
 		Data: data //some data, not necessary
 	});
 ```
-* !WARNING: Field `From` is likely for reference, Rattle autofill field `From`, but for constructors this will be incorrect, in this case you can manually fill this field, or just ignore it.
 
 Write frontend controllers:
 ```
@@ -137,10 +134,16 @@ function constructorExample(){
 
 var test = new constructorExample()
 ```
-* !WARNING: keep in mind that in this case rattle is not correct fill field `From`!
+
+### BENCHMARKS
+
+	BenchmarkJSONRequests-8 	  200000	      8082 ns/op
+	BenchmarkEmptyRequests-8	  300000	      5630 ns/op
 
 
-## TODO:
+
+
+## TODO
 
 * need tests for frontend;
 * and many more other - this is yet a concept!
