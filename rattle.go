@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"golang.org/x/net/websocket"
@@ -90,40 +89,33 @@ func Request(ws *websocket.Conn, bmsg []byte) {
 //  Data may contains payload in json format - for backend, or json,html or another for frontend, not necessary.
 type Message struct {
 	WS   *websocket.Conn
-	From []byte
 	To   []byte
 	Data []byte
 }
 
-//RPCMethod contains name of controller and method
-type RPCMethod struct {
+//rpcMethod contains name of controller and method
+type rpcMethod struct {
 	Controller string
 	Method     string
 }
 
-//NewRPCMethod simple wrapper returned RCPMethod from strings
-// func NewRPCMethod(controller, method string) RPCMethod {
-// 	return RPCMethod{controller, method}
-// }
-
 //Parsemsg parse []byte message to type Message
 func Parsemsg(msg []byte) (*Message, error) {
-	splitted := bytes.SplitN(msg, []byte(" "), 3)
-	if len(splitted) != 3 {
+	splitted := bytes.SplitN(msg, []byte(" "), 2)
+	if len(splitted) != 2 {
 		return nil, errors.New("failed incoming message")
 	}
 
 	r := new(Message)
-	r.From = splitted[0]
-	r.To = splitted[1]
-	r.Data = splitted[2]
+	r.To = splitted[0]
+	r.Data = splitted[1]
 
 	return r, nil
 }
 
 //splitRPC function split string with controller and method to RPCMethod
-func splitRPC(rpc []byte) (RPCMethod, error) {
-	var r RPCMethod
+func splitRPC(rpc []byte) (rpcMethod, error) {
+	var r rpcMethod
 
 	splitted := bytes.SplitN(rpc, []byte("."), 2)
 	if len(splitted) != 2 {
@@ -137,7 +129,7 @@ func splitRPC(rpc []byte) (RPCMethod, error) {
 }
 
 //Join rpc to one []byte line
-func (rpc *RPCMethod) Join() []byte {
+func (rpc *rpcMethod) Join() []byte {
 	return []byte(fmt.Sprintf("%s.%s", rpc.Controller, rpc.Method))
 }
 
@@ -174,7 +166,6 @@ func (r *Message) Call() (*Message, error) {
 	if a == nil {
 		return nil, nil
 	}
-	a.From = rpc.Join()
 
 	return a, nil
 }
@@ -183,7 +174,6 @@ func (r *Message) Call() (*Message, error) {
 func (r *Message) Bytes() []byte {
 	var msg [][]byte
 
-	msg = append(msg, r.From)
 	msg = append(msg, r.To)
 
 	if !regexp.MustCompile("\n$").Match(r.Data) {
@@ -199,7 +189,6 @@ func (r *Message) NewMessage(to string, data ...[]byte) *Message {
 	msg := &Message{}
 	msg.WS = r.WS
 
-	msg.From = getFrom()
 	msg.To = []byte(to)
 
 	if len(data) > 0 {
@@ -214,27 +203,6 @@ func (r *Message) NewMessage(to string, data ...[]byte) *Message {
 func (r *Message) Send() error {
 	_, err := r.WS.Write(r.Bytes())
 	return err
-}
-
-func getFrom() []byte {
-	pc := make([]uintptr, 10)
-	runtime.Callers(2, pc)
-	f := runtime.FuncForPC(pc[1])
-
-	s := strings.Split(f.Name(), "/")
-	funcname := s[len(s)-1]
-
-	fs := strings.Split(funcname, ".")
-	if len(fs) != 3 {
-		if Debug {
-			log.Println("rattle warning: failed get the caller function: " + f.Name())
-		}
-		return []byte("empty")
-	}
-
-	controller := regexp.MustCompile("[\\(\\)\\*]").ReplaceAllString(fs[1], "")
-
-	return []byte(fmt.Sprintf("%s.%s", controller, fs[2]))
 }
 
 //Broadcast send one message for all available connections(users)

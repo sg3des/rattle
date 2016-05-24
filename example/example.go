@@ -41,13 +41,14 @@ func (c *Main) Index(r *rattle.Message) *rattle.Message {
 //Timer is periodic send data
 func (c *Main) Timer(r *rattle.Message) {
 	for {
-		time.Sleep(time.Second)
+
 		t := time.Now().Local().Format("2006.01.02 15:04:05")
 
 		if err := r.NewMessage("#timer", []byte(t)).Send(); err != nil {
 			//if err then connection is closed
 			return
 		}
+		time.Sleep(time.Second)
 	}
 }
 

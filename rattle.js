@@ -15,18 +15,18 @@
 				}
 				context = context[namespaces[i]]
 			}
-			return context[func] //(msg)
+			return context[func]
 		}
 
-		var request = function (msg) {
-			if (msg.To == "" || msg.To == undefined) {
+		var request = function (to, data) {
+			if (to == "" || to == undefined) {
 				return
 			}
 
-			if ("#+.".indexOf(msg.To[0]) != -1) {
-				var element = get(msg.To)
+			if ("#+.".indexOf(to[0]) != -1) {
+				var element = getElement(to)
 				if (!element) {
-					console.error("target element not found: ", msg.To)
+					console.error("target element not found: ", to)
 					return
 				}
 
@@ -35,28 +35,33 @@
 					setvalue = true
 				}
 
-				switch (msg.To[0]) {
+				switch (to[0]) {
 				case "#" || ".":
-					if (setvalue) element.value = msg.Data
+					if (setvalue) element.value = data
 					else
-						element.innerHTML = msg.Data
+						element.innerHTML = data
 
 					break;
 				case "+":
-					if (setvalue) element.value += msg.Data
+					if (setvalue) element.value += data
 					else
-						element.innerHTML += msg.Data
+						element.innerHTML += data
 
 					break;
 				}
 				return
 			}
 
-			msg.Data = JSON.parse(msg.Data)
-			func(msg.To)(msg)
+			try {
+				data = JSON.parse(data)
+				func(to)(data)
+			} catch (e) {
+				func(to)(data)
+			}
+
 		}
 
-		var get = function (name) {
+		var getElement = function (name) {
 			if (name[0] == "#") {
 				return document.getElementById(name.slice(1)) || document.querySelector(name.slice(1))
 			}
@@ -66,19 +71,6 @@
 			}
 
 			return document.querySelector(name)
-		}
-
-		var getCallerFunc = function () {
-			try {
-				throw Error('')
-			} catch (err) {
-
-				var rpcfrom = err.stack.split("\n")[2].split("@")[0]
-				if (rpcfrom == "") {
-					rpcfrom = "global"
-				}
-				return rpcfrom
-			}
 		}
 
 		var NewConnection = function (addr, debug) {
@@ -105,23 +97,15 @@
 
 			onmessage: function (incomingData) {
 				var splitted = incomingData.data.split(' '),
-					from = splitted[0],
-					to = splitted[1],
-					data = splitted.slice(2, splitted.length).join(" ")
+					to = splitted[0],
+					data = splitted.slice(1, splitted.length).join(" ")
 
-				if (this.debug) console.log("rattle: Get message " + from + "->" + to + " with data length:", data.length)
-
-				var msg = {
-					From: from,
-					To: to,
-					Data: data
-				}
+				if (this.debug) console.log("rattle: Get message " + to + " with data length:", data.length)
 
 				if (this.callbacks["message"]) {
-					this.callbacks["message"](msg, evt)
+					this.callbacks["message"](to, data)
 				} else {
-					request(msg)
-					// execute(to, msg)
+					request(to, data)
 				}
 			},
 
@@ -129,23 +113,19 @@
 				this.callbacks[name] = callback;
 			},
 
-			send: function (msg) {
-				if (msg["To"] == undefined || msg["To"] == "") {
+			send: function (to, data) {
+				if (to == undefined || to == "") {
 					console.warn("rattle: field 'To'(target function) is not filled")
 					return
 				}
 
-				if (msg["From"] == undefined) {
-					msg["From"] == getCallerFunc();
+				if (data == undefined) {
+					data = {}
 				}
 
-				if (msg["Data"] == undefined) {
-					msg["Data"] = {}
-				}
+				if (this.debug) console.log("rattle: Send message to: " + to + " with data:", data)
 
-				if (this.debug) console.log("rattle: Send message " + msg.From + "->" + msg.To + " with data:", msg.Data)
-
-				this.ws.send(msg.From + " " + msg.To + " " + JSON.stringify(msg.Data) + "\n")
+				this.ws.send(to + " " + JSON.stringify(data) + "\n")
 			}
 
 		} // end NewConnection.prototype

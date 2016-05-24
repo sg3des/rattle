@@ -10,7 +10,8 @@
 
 run example:
 
-	go run $GOPATH/src/github.com/sg3des/rattle/example/example.go
+	cd $GOPATH/src/github.com/sg3des/rattle/example/ 
+	go run example.go
 
 web server will be listen at `127.0.0.1:8080`
 

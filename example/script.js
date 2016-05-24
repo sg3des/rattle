@@ -3,9 +3,7 @@
 var conn = new rattle.NewConnection("ws://127.0.0.1:8080/ws", true); //addr, debug
 
 conn.on("open", function (evt) {
-	conn.send({
-		To: "Main.Timer"
-	});
+	conn.send("Main.Timer");
 
 	construct.Send();
 })
@@ -17,10 +15,7 @@ var test = {
 		data.text = document.getElementById("text").value;
 		data.name = "val_name";
 
-		conn.send({
-			To: "Main.Index",
-			Data: data
-		});
+		conn.send("Main.Index", data);
 	},
 
 	Recieve: function (msg) {
@@ -34,9 +29,7 @@ function exConstructor(name) {
 	this.name = name;
 
 	this.Send = function (msg) {
-		conn.send({
-			To: "main.something" //call backend procedure not case sensitive - rattle auto TITLize incoming request, example this will be transform to "Main.Something"
-		});
+		conn.send("main.something"); //call backend procedure not case sensitive - rattle auto TITLize incoming request on backend side, for example this will be transform to "Main.Something"
 	};
 
 	this.Recieve = function (msg) {
