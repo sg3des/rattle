@@ -5,21 +5,27 @@
 		<script defer type="text/javascript" src="/script.js"></script>
 		<link href='https://fonts.googleapis.com/css?family=Raleway:100' rel='stylesheet' type='text/css'>
 		<style type="text/css">
-			body{ text-align: center; font-size: 120%; margin:0;}
+			body{ text-align: center; font-size: 120%; margin:10% auto; width:500px;}
 			*{color:#333;}
-			h1{width:100%; font-size: 4em; padding-top: 10%; margin: 0;); font-family: 'Raleway', sans-serif; letter-spacing: 0.1em; text-shadow: 1px 1px 2px rgba(0,0,0,.3)}
-			#quote{padding-left: 10%; font-size: 80%; font-style: italic; margin-bottom: 2%;}
+
+			h1{width:100%; font-size: 4em; margin: 0; font-family: 'Raleway', sans-serif; letter-spacing: 0.1em; text-shadow: 1px 1px 2px rgba(0,0,0,.3)}
+			a{text-decoration: none; color:#555; font-weight: bold;}
+			a:hover, a:hover *{color:#777;}
+
+			footer{position:absolute; width: 98%; bottom:0; left:0; padding:1%;font-size: 80%; font-style: italic;}
 		</style>
 	</head>
 	<body>
+		<a target='_blank' href='https://github.com/sg3des/rattle'><h1>RATTLE</h1></a>
+		<h3 id='description'></h3>
 		
-		<h1>RATTLE</h1>
-		<div id='quote'>*open console for view debug messages</div>
+		<div id='timer' title='Just clock, but updated from backend'></div>
 
-		<div>Just clock, updated from backend: <span id="timer"></span></div>
-		<input type="text" id="text">
+		<input type="text" id="text" placeholder="write here">
 		<input type="button" id="send" onclick="test.Send()" value='click me'>
 		<div id='msgs'></div>
 		<div id='somefield'></div>
+
+		<footer>*open console for view debug messages</footer>
 	</body>
 </html>

@@ -19,8 +19,8 @@ var test = {
 	},
 
 	Recieve: function (msg) {
-		console.log("recieve msg:", msg, msg.Data);
-		document.getElementById("msgs").innerHTML = JSON.stringify(msg.Data);
+		console.log("recieve msg:", msg);
+		document.getElementById("msgs").innerHTML = JSON.stringify(msg);
 	}
 }
 

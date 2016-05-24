@@ -32,7 +32,7 @@ type Main struct {
 //Index is method of controller Main on request takes incoming message and possible return answer message
 func (c *Main) Index(r *rattle.Message) *rattle.Message {
 	//just send message - insert data to h1 field
-	r.NewMessage("#h1", []byte(`Main Index`)).Send()
+	r.NewMessage("#description", []byte(`Rattle is tiny websocket double-sided RPC framework, designed for create web applications`)).Send()
 
 	//returned message call test.Recieve Frontend function with JSON data
 	return r.NewMessage("test.Recieve", []byte(`{"newJSONkey":"`+c.Text+`"}`))
@@ -54,7 +54,7 @@ func (c *Main) Timer(r *rattle.Message) {
 
 //Something is just one more method
 func (c *Main) Something(r *rattle.Message) *rattle.Message {
-	tpldata := []byte(`<a href='https://github.com/sg3des/rattle'>rattle link</a>`)
+	tpldata := []byte(`this link just appended to the body: <a href='https://github.com/sg3des/rattle'>rattle link</a>`)
 
 	r.NewMessage("construct.Recieve").Send()
 
