@@ -57,7 +57,7 @@ Write controller:
 	}
 ```
 Controllers is just struct where parsed JSON requests, however this it can be left empty: `type Main struct{}`
-* Controllers always must be a public, i.e begin with a capital letter.
+* Controllers always must be a public,  i.e begin with a capital letter.
 
 Write method for controller:
 ```
@@ -89,8 +89,6 @@ type Message struct {
 * **Data** field: 
 	* for messages from **backend** to **frontend** can contain any type of data: HTML, JSON, etc;
 	* for messages from **frontend** to **backend** always JSON.
-
-
 
 
 #### Frontend:
@@ -141,8 +139,6 @@ var test = new constructorExample()
 
 	BenchmarkJSONRequests-8 	  200000	      8082 ns/op
 	BenchmarkEmptyRequests-8	  300000	      5630 ns/op
-
-
 
 
 ## TODO
