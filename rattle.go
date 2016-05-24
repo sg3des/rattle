@@ -43,10 +43,15 @@ func getControllerName(c interface{}) string {
 //WSHandler is handler for websocket connections
 func WSHandler(ws *websocket.Conn) {
 	Connections[ws] = true
+
 	scanner := bufio.NewScanner(ws)
 
 	for scanner.Scan() && ws != nil {
-		go Request(ws, scanner.Bytes())
+		imsg := scanner.Bytes()
+		bmsg := make([]byte, len(imsg))
+		copy(bmsg, imsg)
+
+		go Request(ws, bmsg)
 	}
 }
 
@@ -55,26 +60,26 @@ func WSHandler(ws *websocket.Conn) {
 //  2) call specified method of controller
 //  3) and if a answer is returned, then write it to connection
 func Request(ws *websocket.Conn, bmsg []byte) {
-	msg, err := Parsemsg(bmsg)
+	msg, err := parsemsg(bmsg)
 	if err != nil {
 		if Debug {
-			log.Println(err, "rattle incoming msg:", string(bmsg))
+			log.Fatalln(err, "msg:", string(bmsg))
 		}
 		return
 	}
 	msg.WS = ws
 
-	answer, err := msg.Call()
+	a, err := msg.Call()
 	if err != nil {
 		if Debug {
-			log.Println(err, "rattle incoming msg:", string(bmsg))
+			log.Fatalln(err, "msg:", msg)
 		}
 		return
 	}
-	if answer != nil {
-		if err := answer.Send(); err != nil {
+	if a != nil {
+		if err := a.Send(); err != nil {
 			if Debug {
-				log.Println(err, "rattle incoming msg:", string(bmsg))
+				log.Fatalln(err, "msg:", bmsg)
 			}
 
 			ws.Close()
@@ -84,7 +89,6 @@ func Request(ws *websocket.Conn, bmsg []byte) {
 }
 
 //Message type:
-//  From - name of calling function, autofill, can not be empty.
 //  To - contains name of called function, must be filled!
 //  Data may contains payload in json format - for backend, or json,html or another for frontend, not necessary.
 type Message struct {
@@ -93,29 +97,36 @@ type Message struct {
 	Data []byte
 }
 
-//rpcMethod contains name of controller and method
-type rpcMethod struct {
+//methodRPC contains name of controller and method
+type methodRPC struct {
 	Controller string
 	Method     string
 }
 
-//Parsemsg parse []byte message to type Message
-func Parsemsg(msg []byte) (*Message, error) {
-	splitted := bytes.SplitN(msg, []byte(" "), 2)
-	if len(splitted) != 2 {
+var reg = regexp.MustCompile("(?i)^[a-z0-9]+\\.[a-z0-9]+$")
+
+//parsemsg parse []byte message to type Message
+func parsemsg(bmsg []byte) (*Message, error) {
+	splitted := bytes.SplitN(bmsg, []byte(" "), 2)
+	if len(splitted) == 0 {
 		return nil, errors.New("failed incoming message")
 	}
 
-	r := new(Message)
-	r.To = splitted[0]
-	r.Data = splitted[1]
+	r := &Message{To: bytes.Trim(splitted[0], " \n\r")}
+	if !reg.Match(r.To) {
+		return r, errors.New("incoming message contains invalid characters")
+	}
+
+	if len(splitted) == 2 {
+		r.Data = bytes.Trim(splitted[1], " \n\r")
+	}
 
 	return r, nil
 }
 
 //splitRPC function split string with controller and method to RPCMethod
-func splitRPC(rpc []byte) (rpcMethod, error) {
-	var r rpcMethod
+func splitRPC(rpc []byte) (*methodRPC, error) {
+	r := &methodRPC{}
 
 	splitted := bytes.SplitN(rpc, []byte("."), 2)
 	if len(splitted) != 2 {
@@ -129,12 +140,13 @@ func splitRPC(rpc []byte) (rpcMethod, error) {
 }
 
 //Join rpc to one []byte line
-func (rpc *rpcMethod) Join() []byte {
+func (rpc *methodRPC) Join() []byte {
 	return []byte(fmt.Sprintf("%s.%s", rpc.Controller, rpc.Method))
 }
 
 //Call method by name
 func (r *Message) Call() (*Message, error) {
+	a := &Message{}
 	rpc, err := splitRPC(r.To)
 	if err != nil {
 		return nil, err
@@ -152,8 +164,11 @@ func (r *Message) Call() (*Message, error) {
 		return nil, errors.New("404 page not found")
 	}
 
-	if err := json.Unmarshal(r.Data, controller.Interface()); err != nil {
-		return nil, errors.New("failed parse json: " + err.Error())
+	if len(r.Data) > 1 {
+		// fmt.Println(string(r.Data))
+		if err := json.Unmarshal(r.Data, controller.Interface()); err != nil {
+			return nil, errors.New("failed parse json: " + err.Error())
+		}
 	}
 
 	//call controller method
@@ -162,7 +177,7 @@ func (r *Message) Call() (*Message, error) {
 		return nil, nil
 	}
 
-	a := refAnswer[0].Interface().(*Message)
+	a = refAnswer[0].Interface().(*Message)
 	if a == nil {
 		return nil, nil
 	}
@@ -171,42 +186,42 @@ func (r *Message) Call() (*Message, error) {
 }
 
 //Bytes convert Message type to []byte, for write to socket
-func (r *Message) Bytes() []byte {
-	var msg [][]byte
+func (r *Message) Bytes() (bmsg []byte) {
+	buf := bytes.NewBuffer(bmsg)
 
-	msg = append(msg, r.To)
+	buf.Write(r.To)
+	buf.WriteRune(' ')
+	buf.Write(r.Data)
 
-	if !regexp.MustCompile("\n$").Match(r.Data) {
-		r.Data = append(r.Data, []byte("\n")...)
-	}
-	msg = append(msg, r.Data)
+	bmsg = buf.Bytes()
+	bmsg = regexp.MustCompile("\n*$").ReplaceAll(bmsg, []byte("\n"))
 
-	return bytes.Join(msg, []byte(" "))
+	return
 }
 
 //NewMessage create answer message
 func (r *Message) NewMessage(to string, data ...[]byte) *Message {
-	msg := &Message{}
-	msg.WS = r.WS
+	msg := &Message{WS: r.WS, To: []byte(to)}
+	// msg.WS = r.WS
 
-	msg.To = []byte(to)
+	// msg.To =
 
 	if len(data) > 0 {
 		msg.Data = data[0]
-	} else {
-		msg.Data = []byte(`{}`)
-	}
+	} // else {
+	// 	msg.Data = []byte(`{}`)
+	// }
 	return msg
 }
 
 //Send message to connection
-func (r *Message) Send() error {
+func (r Message) Send() error {
 	_, err := r.WS.Write(r.Bytes())
 	return err
 }
 
 //Broadcast send one message for all available connections(users)
-func (r *Message) Broadcast() {
+func (r Message) Broadcast() {
 	for conn := range Connections {
 		if conn != nil {
 			conn.Write(r.Bytes())

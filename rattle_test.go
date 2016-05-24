@@ -1,9 +1,7 @@
 package rattle
 
 import (
-	"bufio"
 	"bytes"
-	"fmt"
 	"log"
 	"net/http"
 	"reflect"
@@ -21,20 +19,19 @@ var (
 
 // ****
 // fake controllers for tests
-
 type FakeController struct {
 	Name string
 }
 
 func (c *FakeController) FakeMethod(r *Message) *Message {
-	fmt.Println("recieve message:", c)
+	// fmt.Println("recieve message:", c)
 	r.NewMessage("tovoid0").Send()
 	return r.NewMessage("tovoid1")
 }
 
-func (c *FakeController) FakeEmptyMethod(r *Message) {}
-
-// TESTS
+func (c *FakeController) FakeEmptyMethod(r *Message) {
+	time.Sleep(time.Second)
+}
 
 func init() {
 	Debug = true
@@ -56,6 +53,7 @@ func init() {
 	time.Sleep(300 * time.Millisecond)
 }
 
+// TESTS
 func TestSetControllers(t *testing.T) {
 	// controllers already set in init, just check the correctness of this
 
@@ -85,35 +83,35 @@ func TestRequest(t *testing.T) {
 		t.Error(err)
 	}
 
-	go fakeReciever()
+	// go fakeReciever()
 
-	msg := &Message{From: []byte("test.From"), To: []byte("FakeController.FakeMethod"), Data: []byte(`{"Name":"testname"}`)}
+	msg := &Message{To: []byte("FakeController.FakeMethod"), Data: []byte(`{"Name":"testname"}`)}
 	if _, err := conn.Write(msg.Bytes()); err != nil {
 		t.Error(err)
 	}
 }
 
-func fakeReciever() {
-	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
-		bmsg := scanner.Bytes()
-		fmt.Println("msg for frontend:", string(bmsg))
-	}
-}
+// func fakeReciever() {
+// 	scanner := bufio.NewScanner(conn)
+// 	for scanner.Scan() {
+// 		bmsg := scanner.Bytes()
+// 		fmt.Println("msg for frontend:", string(bmsg))
+// 	}
+// }
 
 func TestParsemsg(t *testing.T) {
-	incorrectmsgs := []string{"\n", "fakeController.fakeMethod {}\n", "{}\n", "test.From test.toMethod\n", "test.From fakeController.fakeMethod"}
+	incorrectmsgs := []string{"\n", "{}\n", " test.toMethod\n"}
 
 	for _, smsg := range incorrectmsgs {
-		_, err := Parsemsg([]byte(smsg))
+		_, err := parsemsg([]byte(smsg))
 		if err == nil {
 			t.Error("failed parse msg: '" + smsg + "' must be error")
 		}
 	}
 
-	correctmsg := []byte("test.From FakeController.FakeMethod {\"name\":\"value\"}\n")
+	correctmsg := []byte("FakeController.FakeMethod {\"name\":\"value\"}\n")
 
-	msg, err := Parsemsg(correctmsg)
+	msg, err := parsemsg(correctmsg)
 	if err != nil {
 		t.Error(err)
 	}
@@ -128,18 +126,45 @@ func TestParsemsg(t *testing.T) {
 	}
 
 	if !bytes.Equal(msg.Bytes(), correctmsg) {
-		t.Error("failed convert msg to bytes")
+		t.Error("failed convert msg to bytes", string(msg.Bytes()), string(correctmsg))
 	}
 
-	//disable debug, because otherwise there will be a warning of failed determine caller function name - it`s ok, as this not use controller-method architecture
-	Debug = false
 	newmsg := msg.NewMessage("test.To")
 	if !bytes.Equal(newmsg.To, []byte(`test.To`)) {
 		t.Error("failed create new message field To fill incorrect")
 	}
-	Debug = true
 
-	if !bytes.Equal(newmsg.Data, []byte(`{}`)) {
+	if len(newmsg.Data) != 0 {
 		t.Error("failed create new message field Data fill incorrect")
+	}
+}
+
+//****
+//Benchmarks
+func BenchmarkJSONRequests(b *testing.B) {
+	conn, err = websocket.Dial("ws://"+addr+"/ws", "", "http://"+addr)
+	if err != nil {
+		b.Error(err)
+	}
+
+	msg := &Message{To: []byte("FakeController.FakeEmptyMethod"), Data: []byte(`{"Name":"TestValue"}`)}
+	bmsg := msg.Bytes()
+
+	for i := 0; i < b.N; i++ {
+		conn.Write(bmsg)
+	}
+}
+
+func BenchmarkEmptyRequests(b *testing.B) {
+	conn, err = websocket.Dial("ws://"+addr+"/ws", "", "http://"+addr)
+	if err != nil {
+		b.Error(err)
+	}
+
+	msg := &Message{To: []byte("FakeController.FakeEmptyMethod")}
+	bmsg := msg.Bytes()
+
+	for i := 0; i < b.N; i++ {
+		conn.Write(bmsg)
 	}
 }
