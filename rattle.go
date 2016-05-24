@@ -47,11 +47,13 @@ func WSHandler(ws *websocket.Conn) {
 	scanner := bufio.NewScanner(ws)
 
 	for scanner.Scan() && ws != nil {
-		imsg := scanner.Bytes()
-		bmsg := make([]byte, len(imsg))
-		copy(bmsg, imsg)
+		//create new slice, otherwise the incoming data can be changed before request executed
+		bmsg := append([]byte{}, scanner.Bytes()...)
+		// imsg := scanner.Bytes()
+		// bmsg := make([]byte, len(imsg))
+		// copy(bmsg, imsg)
 
-		go Request(ws, bmsg)
+		go Request(ws, bmsg[0:])
 	}
 }
 
@@ -72,18 +74,19 @@ func Request(ws *websocket.Conn, bmsg []byte) {
 	a, err := msg.Call()
 	if err != nil {
 		if Debug {
-			log.Fatalln(err, "msg:", msg)
+			log.Fatalln(err, "msg:", string(bmsg))
 		}
 		return
 	}
 	if a != nil {
 		if err := a.Send(); err != nil {
 			if Debug {
-				log.Fatalln(err, "msg:", bmsg)
+				log.Fatalln(err, "msg:", string(bmsg))
 			}
 
 			ws.Close()
 			delete(Connections, ws)
+			ws = nil
 		}
 	}
 }
