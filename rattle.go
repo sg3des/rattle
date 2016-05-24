@@ -202,26 +202,22 @@ func (r *Message) Bytes() (bmsg []byte) {
 //NewMessage create answer message
 func (r *Message) NewMessage(to string, data ...[]byte) *Message {
 	msg := &Message{WS: r.WS, To: []byte(to)}
-	// msg.WS = r.WS
-
-	// msg.To =
 
 	if len(data) > 0 {
 		msg.Data = data[0]
-	} // else {
-	// 	msg.Data = []byte(`{}`)
-	// }
+	}
+
 	return msg
 }
 
 //Send message to connection
-func (r Message) Send() error {
+func (r *Message) Send() error {
 	_, err := r.WS.Write(r.Bytes())
 	return err
 }
 
 //Broadcast send one message for all available connections(users)
-func (r Message) Broadcast() {
+func (r *Message) Broadcast() {
 	for conn := range Connections {
 		if conn != nil {
 			conn.Write(r.Bytes())
