@@ -3,74 +3,58 @@
 (function (global) {
 	if (global["WebSocket"]) {
 
-		var func = function (functionName, msg) {
+		var call = function (to, data) {
+			if (to == "" || to == undefined) return;
+
+			if ("=+".indexOf(to[0]) != -1) {
+				callElement(to, data)
+			} else {
+				callFunction(to, data)
+			}
+		}
+
+		var callElement = function (to, data) {
+			var element = document.querySelector(to.slice(1))
+			if (!element) {
+				console.error("target element not found: ", to.slice(1))
+				return;
+			}
+
+			if (element.tagName == "INPUT" || element.tagName == "TEXTAREA") {
+				element.value = to[0] == "=" ? data : element.value + data
+			} else {
+				element.innerHTML = to[0] == "=" ? data : element.innerHTML + data
+			}
+		}
+
+		var callFunction = function (to, data) {
+			var func = getFunction(to)
+			if (!func) {
+				console.error("target function not found: ", to)
+				return;
+			}
+
+			try {
+				data = JSON.parse(data)
+				func(data)
+			} catch (e) {
+				func(data)
+			}
+		}
+
+		var getFunction = function (functionName) {
 			var namespaces = functionName.split(".")
 			var func = namespaces.pop()
 			var context = window
 
 			for (var i = 0; i < namespaces.length; i++) {
 				if (context[namespaces[i]] == undefined) {
-					console.warn("rpc function not found", functionName)
-					return
+					// console.warn("rpc function not found", functionName)
+					return undefined;
 				}
 				context = context[namespaces[i]]
 			}
-			return context[func]
-		}
-
-		var request = function (to, data) {
-			if (to == "" || to == undefined) {
-				return
-			}
-
-			if ("#+.".indexOf(to[0]) != -1) {
-				var element = getElement(to)
-				if (!element) {
-					console.error("target element not found: ", to)
-					return
-				}
-
-				var setvalue = false
-				if (element.tagName == "INPUT" || element.tagName == "TEXTAREA") {
-					setvalue = true
-				}
-
-				switch (to[0]) {
-				case "#" || ".":
-					if (setvalue) element.value = data
-					else
-						element.innerHTML = data
-
-					break;
-				case "+":
-					if (setvalue) element.value += data
-					else
-						element.innerHTML += data
-
-					break;
-				}
-				return
-			}
-
-			try {
-				data = JSON.parse(data)
-				func(to)(data)
-			} catch (e) {
-				func(to)(data)
-			}
-
-		}
-
-		var getElement = function (name) {
-			if (name[0] == "#") {
-				return document.getElementById(name.slice(1)) || document.querySelector(name.slice(1))
-			}
-
-			if (name[0] == "+") {
-				return document.querySelector(name.slice(1))
-			}
-
-			return document.querySelector(name)
+			return context[func];
 		}
 
 		var NewConnection = function (addr, debug) {
@@ -105,7 +89,7 @@
 				if (this.callbacks["message"]) {
 					this.callbacks["message"](to, data)
 				} else {
-					request(to, data)
+					call(to, data)
 				}
 			},
 
@@ -116,7 +100,7 @@
 			send: function (to, data) {
 				if (to == undefined || to == "") {
 					console.warn("rattle: field 'To'(target function) is not filled")
-					return
+					return;
 				}
 
 				if (data == undefined) {

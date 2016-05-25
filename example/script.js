@@ -4,37 +4,25 @@ var conn = new rattle.NewConnection("ws://127.0.0.1:8080/ws", true); //addr, deb
 
 conn.on("open", function (evt) {
 	conn.send("Main.Timer");
-
-	construct.Send();
+	conn.send("Main.Index")
 })
 
 //for this case, rattle correct fill field `From` 
 var test = {
-	Send: function (msg) {
+	Send: function () {
 		var data = {};
 		data.text = document.getElementById("text").value;
-		data.name = "val_name";
 
-		conn.send("Main.Index", data);
+		var url = document.getElementById("json").checked ? "Main.JSON" : "Main.RAW"
+
+		conn.send(url, data);
 	},
 
-	Recieve: function (msg) {
-		console.log("recieve msg:", msg);
-		document.getElementById("msgs").innerHTML = JSON.stringify(msg);
+	RecieveJSON: function (data) {
+		document.getElementById("msgs").innerHTML = JSON.stringify(data);
+	},
+
+	RecieveRAW: function (data) {
+		document.getElementById("msgs").innerHTML = data;
 	}
 }
-
-//WARNING! for constructors, rattle not correct determine  field `From`!!!
-function exConstructor(name) {
-	this.name = name;
-
-	this.Send = function (msg) {
-		conn.send("main.something"); //call backend procedure not case sensitive - rattle auto TITLize incoming request on backend side, for example this will be transform to "Main.Something"
-	};
-
-	this.Recieve = function (msg) {
-		document.getElementById("somefield").innerHTML = "i`m function Recieve"
-	};
-}
-
-var construct = new exConstructor("construct");

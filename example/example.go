@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -25,38 +26,40 @@ func main() {
 //Main controller, into fields parse JSON requests
 //!in real project controller will be located in another package
 type Main struct {
-	Name string
 	Text string
 }
 
 //Index is method of controller Main on request takes incoming message and possible return answer message
 func (c *Main) Index(r *rattle.Message) *rattle.Message {
-	//just send message - insert data to h1 field
-	r.NewMessage("#description", []byte(`Rattle is tiny websocket double-sided RPC framework, designed for create web applications`)).Send()
-
-	//returned message call test.Recieve Frontend function with JSON data
-	return r.NewMessage("test.Recieve", []byte(`{"newJSONkey":"`+c.Text+`"}`))
+	//return answer - insert data to field with id description
+	return r.NewMessage("=#description", []byte(`Rattle is tiny websocket double-sided RPC framework, designed for create dynamic web applications`))
 }
 
-//Timer is periodic send data
+//JSON method
+func (c *Main) JSON(r *rattle.Message) *rattle.Message {
+	data, err := json.Marshal(c)
+	if err != nil {
+		return r.NewMessage("+#errors", []byte("failed parse JSON request, error: "+err.Error()))
+	}
+	//call "test.RecieveJSON frontend function and send to it JSON data"
+	return r.NewMessage("test.RecieveJSON", data)
+}
+
+//RAW method
+func (c *Main) RAW(r *rattle.Message) *rattle.Message {
+	//call "test.RecieveRAW frontend function and send to raw data"
+	return r.NewMessage("test.RecieveRAW", []byte(c.Text))
+}
+
+//Timer is example of periodic send data, note the that function does not return anything
 func (c *Main) Timer(r *rattle.Message) {
 	for {
-
 		t := time.Now().Local().Format("2006.01.02 15:04:05")
-
-		if err := r.NewMessage("#timer", []byte(t)).Send(); err != nil {
+		if err := r.NewMessage("=#timer", []byte(t)).Send(); err != nil {
 			//if err then connection is closed
 			return
 		}
+
 		time.Sleep(time.Second)
 	}
-}
-
-//Something is just one more method
-func (c *Main) Something(r *rattle.Message) *rattle.Message {
-	tpldata := []byte(`this link just appended to the body: <a href='https://github.com/sg3des/rattle'>rattle link</a>`)
-
-	r.NewMessage("construct.Recieve").Send()
-
-	return r.NewMessage("+body", tpldata)
 }

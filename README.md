@@ -69,10 +69,9 @@ func (c *Main) Index(r *rattle.Message) *rattle.Message {
 ```
 * Methods always takes incoming messages, and can(not necessary) return response;
 * based on an incoming message, you can create an answer: `r.NewMessage(to,data)`, where:
-	* first argument is can the name of the called frontend function, or if it starts with symbols `#`, `+` or `.` - target HTML element (**!NOTICE: symbol selector is not fully CSS compatible!**), that means: 
-		* `#` - crop first symbol, then search element by id, or if it not found search with querySelector, after this place data into element;
-		* `+` - crop first symbol, then search with query selector, and then adds the html data to the existing in element;
-		* `.` - just search with query selector, and then place the data into this element.
+	* first argument is can the name of the called frontend function, or if it starts with symbols `=` or `+` or - target will be HTML element found with js `querySelector`, examples:
+		* `=#idname`, `=tagname`, `=.classname` - crop first symbol `=`, then **place** data to element founded by `querySelector`
+		* `+#idname`, `+tagname`, `+.classname` - crop first symbol `+`, then **adds** the data to the existing in founded element;
 	* second argument is data in []byte format, and may be type JSON, HTML, etc...
 
 
@@ -99,20 +98,17 @@ First need connect to server/backend:
 ```
 * second boolean argument is enable/disable debug mode.
 
-Possible bind some custom actions for events, in the next example bind event *open*. 
+Possible bind some custom actions for events: **open**,**close**,**message**. In the next example bind event *open*. 
 ```
 	conn.on("open", function (evt) {
-		[...]
+		conn.send("Main.Index");
 	})
 
 ```
 
 In order to send request/message:
 ```
-	conn.send({
-		To: "Main.Index", // name of the called backend function
-		Data: data //some data, not necessary
-	});
+	conn.send("Main.Index", data);
 ```
 
 Write frontend controllers:

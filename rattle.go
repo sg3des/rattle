@@ -30,7 +30,7 @@ func SetControllers(userContollers ...interface{}) http.Handler {
 		Controllers[getControllerName(c)] = c
 	}
 
-	return websocket.Handler(WSHandler)
+	return websocket.Handler(wshandler)
 }
 
 //getControllerName determine name of struct through reflect
@@ -40,8 +40,8 @@ func getControllerName(c interface{}) string {
 	return strings.Trim(f, ". ")
 }
 
-//WSHandler is handler for websocket connections
-func WSHandler(ws *websocket.Conn) {
+//wshandler is handler for websocket connections
+func wshandler(ws *websocket.Conn) {
 	Connections[ws] = true
 
 	scanner := bufio.NewScanner(ws)
@@ -53,7 +53,7 @@ func WSHandler(ws *websocket.Conn) {
 		// bmsg := make([]byte, len(imsg))
 		// copy(bmsg, imsg)
 
-		go Request(ws, bmsg[0:])
+		go request(ws, bmsg[0:])
 	}
 }
 
@@ -61,11 +61,11 @@ func WSHandler(ws *websocket.Conn) {
 //  1) parse message
 //  2) call specified method of controller
 //  3) and if a answer is returned, then write it to connection
-func Request(ws *websocket.Conn, bmsg []byte) {
+func request(ws *websocket.Conn, bmsg []byte) {
 	msg, err := parsemsg(bmsg)
 	if err != nil {
 		if Debug {
-			log.Fatalln(err, "msg:", string(bmsg))
+			log.Println(err, "msg:", string(bmsg))
 		}
 		return
 	}
@@ -74,14 +74,14 @@ func Request(ws *websocket.Conn, bmsg []byte) {
 	a, err := msg.Call()
 	if err != nil {
 		if Debug {
-			log.Fatalln(err, "msg:", string(bmsg))
+			log.Println(err, "msg:", string(bmsg))
 		}
 		return
 	}
 	if a != nil {
 		if err := a.Send(); err != nil {
 			if Debug {
-				log.Fatalln(err, "msg:", string(bmsg))
+				log.Println(err, "msg:", string(bmsg))
 			}
 
 			ws.Close()
