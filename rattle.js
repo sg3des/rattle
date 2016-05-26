@@ -57,43 +57,53 @@
 			return context[func];
 		}
 
-		var NewConnection = function (addr, debug) {
+		var newConnection = function (addr, debug) {
+			this.addr = addr
 			this.debug = debug
+			this.connected = false
+
 			this.ws = new WebSocket(addr)
-			this.ws.onclose = this.onclose.bind(this)
-			this.ws.onopen = this.onopen.bind(this)
-			this.ws.onmessage = this.onmessage.bind(this)
+			this.ws.onopen = this.onConnect.bind(this)
+			this.ws.onclose = this.onDisconnect.bind(this)
+			this.ws.onmessage = this.onMessage.bind(this)
+
 			this.callbacks = {}
+
+			this.connect = connect
+			this.disconnect = disconnect
+
 		}
 
-		NewConnection.prototype = {
-			constructor: NewConnection,
+		newConnection.prototype = {
+			constructor: newConnection,
 
-			onopen: function (evt) {
+			onConnect: function (evt) {
+				this.connected = true
 				if (this.debug) console.log("rattle: connected")
-				if (this.callbacks["open"]) this.callbacks["open"](evt);
+				if (this.callbacks["onConnect"]) this.callbacks["onConnect"](evt);
 			},
 
-			onclose: function (evt) {
+			onDisconnect: function (evt) {
+				this.connected = false
 				if (this.debug) console.log("rattle: disconnected")
-				if (this.callbacks["close"]) this.callbacks["close"](evt);
+				if (this.callbacks["onDisconnect"]) this.callbacks["onDisconnect"](evt);
 			},
 
-			onmessage: function (incomingData) {
+			onMessage: function (incomingData) {
 				var splitted = incomingData.data.split(' '),
 					to = splitted[0],
 					data = splitted.slice(1, splitted.length).join(" ")
 
 				if (this.debug) console.log("rattle: Get message " + to + " with data length:", data.length)
 
-				if (this.callbacks["message"]) {
-					this.callbacks["message"](to, data)
+				if (this.callbacks["onMessage"]) {
+					this.callbacks["onMessage"](to, data)
 				} else {
 					call(to, data)
 				}
 			},
 
-			on: function (name, callback) {
+			event: function (name, callback) {
 				this.callbacks[name] = callback;
 			},
 
@@ -111,11 +121,26 @@
 
 				this.ws.send(to + " " + JSON.stringify(data) + "\n")
 			}
+		} // end newConnection.prototype
 
-		} // end NewConnection.prototype
+		var disconnect = function () {
+			if (this.connected) {
+				this.ws.close()
+			}
+		}
+
+		var connect = function () {
+			if (this.connected) {
+				return
+			}
+			this.ws = new WebSocket(this.addr)
+			this.ws.onopen = this.onConnect.bind(this)
+			this.ws.onclose = this.onDisconnect.bind(this)
+			this.ws.onmessage = this.onMessage.bind(this)
+		}
 
 		global.rattle = {
-			NewConnection: NewConnection
+			newConnection: newConnection
 		}
 
 	} else {

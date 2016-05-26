@@ -1,8 +1,10 @@
 'use strict';
 
-var conn = new rattle.NewConnection("ws://127.0.0.1:8080/ws", true); //addr, debug
+var conn = new rattle.newConnection("ws://127.0.0.1:8080/ws", true); //addr, debug
 
-conn.on("open", function (evt) {
+console.log(conn)
+conn.event("onConnect", function (evt) {
+	document.getElementById("toggle").checked = true;
 	conn.send("Main.Timer");
 	conn.send("Main.Index")
 })
@@ -24,5 +26,15 @@ var test = {
 
 	RecieveRAW: function (data) {
 		document.getElementById("msgs").innerHTML = data;
+	}
+}
+
+function toggle() {
+	console.log(conn)
+
+	if (conn.connected) {
+		conn.disconnect()
+	} else {
+		conn.connect()
 	}
 }

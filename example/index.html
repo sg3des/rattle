@@ -8,7 +8,7 @@
 		<style type="text/css">
 			body{ text-align: center; font-size: 120%; margin:10% auto; width:500px;}
 			*{color:#333; cursor: default; box-sizing: border-box;}
-			input,textarea{cursor: auto; border:1px solid #ccc; background: white; padding:5px; font-size: 100%; box-shadow: 0 5px 10px rgba(0,0,0,.1)}
+			input,textarea{cursor: auto; border:1px solid #ccc; background: white; font-size: 100%; box-shadow: 0 5px 10px rgba(0,0,0,.1); line-height: 30px;}
 
 			h1{width:100%; font-size: 4em; margin: 0; font-family: 'Raleway', sans-serif; letter-spacing: 0.1em; text-shadow: 1px 1px 2px rgba(0,0,0,.3);}
 			#description{text-align: justify; font-weight: normal; text-shadow: 1px 1px 1px rgba(0,0,0,.2);}
@@ -18,10 +18,10 @@
 
 			form{width: 100%; margin: 5% 0; line-height: 30px;}
 			#text{width: 80%;}
-			#json{display: none;}
-			#json ~ label{display: inline-block;  position: relative; font-size: 70%; top:-2px; padding: 0 0 0 10px; cursor: pointer;}
-			#json ~ label:after{content: ''; width: 4px; height: 20px; border:1px solid #ccc; background: #eee; position: absolute; top:4px; left:0; }
-			#json:checked ~ label:after{background: #4a4;}
+			input[type='checkbox']{display: none;}
+			input[type='checkbox'] ~ label{display: inline-block;  position: relative; font-size: 70%; padding: 0 0 0 10px; cursor: pointer; line-height: 34px;}
+			input[type='checkbox'] ~ label:after{content: ''; width: 4px; height: 20px; border:1px solid #ccc; background: #eee; position: absolute; top:5px; left:0; }
+			input[type='checkbox']:checked ~ label:after{background: #4a4;}
 
 
 
@@ -31,6 +31,11 @@
 		</style>
 	</head>
 	<body>
+
+		<!-- <label>connected:<input type="button" onclick="toggle()"></label> -->
+
+		<input type="checkbox" id='toggle' checked onclick="toggle()">
+		<label for="toggle">CONNECTED</label>
 
 		<a target='_blank' href='https://github.com/sg3des/rattle'><h1>RATTLE</h1></a>
 		<h3 id='description'></h3>
