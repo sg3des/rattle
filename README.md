@@ -78,7 +78,7 @@ func (c *Main) Index(r *rattle.Conn) *rattle.Message {
 Strucutre of message:
 ```
 type Message struct {
-	WS   *rattle.Conn
+	[not exported field with currect Connection]
 	To   []byte
 	Data []byte
 }
