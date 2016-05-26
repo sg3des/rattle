@@ -27,6 +27,16 @@ var (
 	onDisconnect func(*Conn)
 )
 
+//SetOnConnect bind event onconnect
+func SetOnConnect(f func(*Conn)) {
+	onConnect = f
+}
+
+//SetOnDisconnect bind event onDisconnect
+func SetOnDisconnect(f func(*Conn)) {
+	onDisconnect = f
+}
+
 //SetControllers bind controllers
 func SetControllers(userContollers ...interface{}) http.Handler {
 	for _, c := range userContollers {
@@ -57,6 +67,7 @@ func wshandler(ws *websocket.Conn) {
 	c.Disconnect()
 }
 
+//newConnection
 func newConnection(ws *websocket.Conn) *Conn {
 	c := &Conn{ws}
 	Connections[c] = true
@@ -68,6 +79,7 @@ func newConnection(ws *websocket.Conn) *Conn {
 	return c
 }
 
+//Disconnect end the current connection
 func (c *Conn) Disconnect() {
 	if c != nil {
 		c.WebSocket.Close()
@@ -81,16 +93,9 @@ func (c *Conn) Disconnect() {
 	}
 }
 
+//Conn is main struct contains websocket.Conn
 type Conn struct {
 	WebSocket *websocket.Conn
-}
-
-func SetOnConnect(f func(*Conn)) {
-	onConnect = f
-}
-
-func SetOnDisconnect(f func(*Conn)) {
-	onDisconnect = f
 }
 
 //Request is main function, takes connection and raw incoming message

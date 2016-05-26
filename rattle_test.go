@@ -2,6 +2,7 @@ package rattle
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
 	"reflect"
@@ -23,13 +24,13 @@ type FakeController struct {
 	Name string
 }
 
-func (c *FakeController) FakeMethod(r *Message) *Message {
+func (c *FakeController) FakeMethod(r *Conn) *Message {
 	// fmt.Println("recieve message:", c)
 	r.NewMessage("tovoid0").Send()
 	return r.NewMessage("tovoid1")
 }
 
-func (c *FakeController) FakeEmptyMethod(r *Message) {
+func (c *FakeController) FakeEmptyMethod(r *Conn) {
 	time.Sleep(time.Second)
 }
 
@@ -116,12 +117,12 @@ func TestParsemsg(t *testing.T) {
 		t.Error(err)
 	}
 
-	rpcmethod, err := splitRPC(msg.To)
+	rpc, err := splitRPC(msg.To)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if !bytes.Equal(rpcmethod.Join(), msg.To) {
+	if !bytes.Equal([]byte(fmt.Sprintf("%s.%s", rpc.Controller, rpc.Method)), msg.To) {
 		t.Error("failed inverse transformation controller and method")
 	}
 
@@ -129,7 +130,9 @@ func TestParsemsg(t *testing.T) {
 		t.Error("failed convert msg to bytes", string(msg.Bytes()), string(correctmsg))
 	}
 
-	newmsg := msg.NewMessage("test.To")
+	c := new(Conn)
+	// Conn.NewMessage(to, ...)
+	newmsg := c.NewMessage("test.To")
 	if !bytes.Equal(newmsg.To, []byte(`test.To`)) {
 		t.Error("failed create new message field To fill incorrect")
 	}
