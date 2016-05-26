@@ -61,7 +61,7 @@ Controllers is just struct where parsed JSON requests, however this it can be le
 
 Write method for controller:
 ```
-func (c *Main) Index(r *rattle.Message) *rattle.Message {
+func (c *Main) Index(r *rattle.Conn) *rattle.Message {
 	r.NewMessage("#h1", []byte(`Main Index`)).Send()
 	return r.NewMessage("test.Recieve", []byte(`{"newJSONkey":"`+c.Text+`"}`))
 }
@@ -78,7 +78,7 @@ func (c *Main) Index(r *rattle.Message) *rattle.Message {
 Strucutre of message:
 ```
 type Message struct {
-	WS   *websocket.Conn
+	WS   *rattle.Conn
 	To   []byte
 	Data []byte
 }
@@ -98,9 +98,9 @@ First need connect to server/backend:
 ```
 * second boolean argument is enable/disable debug mode.
 
-Possible bind some custom actions for events: **open**,**close**,**message**. In the next example bind event *open*. 
+Possible bind some custom actions for events: **onConnect**,**onDisconnect**,**onMessage**. In the next example bind event *onConnect*. 
 ```
-	conn.on("open", function (evt) {
+	conn.event("onConnect", function (evt) {
 		conn.send("Main.Index");
 	})
 
