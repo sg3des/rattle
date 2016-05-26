@@ -83,7 +83,6 @@ type Message struct {
 	Data []byte
 }
 ```
-* **WS** field contains current websocket connection - does not require user action;
 * **To** field contain name of the called function - is required to fill by user;
 * **Data** field: 
 	* for messages from **backend** to **frontend** can contain any type of data: HTML, JSON, etc;
