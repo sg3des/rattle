@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -67,6 +68,11 @@ func (c *Main) Timer(r *rattle.Conn) {
 
 		time.Sleep(time.Second)
 	}
+}
+
+func (c *Main) File(r *rattle.Conn) {
+	log.Println("incoming file:", r.File.Name, "size:", r.File.Buffer.Len())
+	ioutil.WriteFile(r.File.Name, r.File.Buffer.Bytes(), 0644)
 }
 
 //OnConnect handler function for event connection

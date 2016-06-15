@@ -4,7 +4,7 @@
 
 ### Rattle is websocket double-sided rpc solution - designed for create MVVM web applications.
 
-#### WARNING: Rattle is only concept!
+#### WARNING: Rattle is only concept! 
 
 ## INSTALL
 
@@ -25,11 +25,11 @@ MVVM architecture more suitable for this, but design it on http requests a bit e
 
 Rattle is tiny websocket double-sided framework. Backend is go, Frontend - javascript.
 
-* For connections use websockets;
-* Requests can come from backend and frontend at the same time: 
-	* From Backend possible call any Frontend(js) functions and pass arguments.
-	* From Backend possible directly insert data to any html element.
-	* From Frontend possible call any public methods of declare controllers.
+	1) For connection use only websocket;
+	2) Requests can come from backend and frontend at the same time;
+	3) Requests are processed asynchronously;
+	4) Supports file uploading, multiple and large files too;
+	5) RATTLE significantly reduces the amount of code in web application;
 
 
 ## USAGE
@@ -132,11 +132,14 @@ var test = new constructorExample()
 
 ### BENCHMARKS
 
-	BenchmarkJSONRequests-8 	  200000	      8082 ns/op
-	BenchmarkEmptyRequests-8	  300000	      5630 ns/op
+	BenchmarkJSONRequests-8 	  200000	      7329 ns/op
+	BenchmarkEmptyRequests-8	  300000	      4196 ns/op
+
+
 
 
 ## TODO
 
+* need more test for backend;
 * need tests for frontend;
 * and many more other - this is yet a concept!

@@ -14,7 +14,16 @@
 		}
 
 		var callElement = function (to, data) {
-			var element = document.querySelector(to.slice(1))
+			var element
+			switch (to[1]) {
+			case "#":
+				element = document.getElementById(to.slice(2))
+				break;
+			default:
+				element = document.querySelector(to.slice(1))
+				break;
+			}
+
 			if (!element) {
 				console.error("target element not found: ", to.slice(1))
 				return;
@@ -61,6 +70,7 @@
 			this.addr = addr
 			this.debug = debug
 			this.connected = false
+			this.boundary = ""
 
 			this.ws = new WebSocket(addr)
 			this.ws.onopen = this.onConnect.bind(this)
@@ -72,6 +82,8 @@
 			this.connect = connect
 			this.disconnect = disconnect
 
+			this.stream = stream
+			this.streamNext = streamNext
 		}
 
 		newConnection.prototype = {
@@ -94,7 +106,12 @@
 					to = splitted[0],
 					data = splitted.slice(1, splitted.length).join(" ")
 
-				if (this.debug) console.log("rattle: Get message " + to + " with data length:", data.length)
+				if (to == "stream") {
+					this.stream()
+					return
+				}
+
+				if (this.debug) console.log("rattle: Get message to: " + to + " with data length:", data.length)
 
 				if (this.callbacks["onMessage"]) {
 					this.callbacks["onMessage"](to, data)
@@ -119,9 +136,76 @@
 
 				if (this.debug) console.log("rattle: Send message to: " + to + " with data:", data)
 
-				this.ws.send(to + " " + JSON.stringify(data) + "\n")
-			}
+				this.ws.send(to + " json " + JSON.stringify(data) + "\n")
+			},
+
+			file: function (to, input, userdata) {
+				if (input.files.length == 0) {
+					console.warn("files not found")
+					return
+				}
+
+				streamData.to = to
+				streamData.files = input.files
+				streamData.userdata = userdata
+				streamData.current = 0
+
+				this.stream()
+			},
 		} // end newConnection.prototype
+
+		var streamData = {
+			to: "",
+			files: "",
+			userdata: {},
+			i: 0,
+			offset: 0,
+			slicesize: 1024 * 1024
+		}
+
+		var streamNext = function (ws) {
+			if (streamData.i >= streamData.files.length) {
+				return false;
+			}
+			// console.log(this)
+			switch (streamData.offset) {
+			case 0:
+				// console.log(this)
+
+				ws.send(streamData.to + " stream " + JSON.stringify(streamData.userdata) + " " + JSON.stringify({
+					name: streamData.files[streamData.i].name,
+					size: streamData.files[streamData.i].size,
+					slicesize: streamData.slicesize
+				}) + "\n")
+
+				return true;
+
+			case streamData.files[streamData.i].size:
+				ws.send("\n-- finish\n")
+
+				streamData.offset = 0
+				streamData.i++
+
+				return streamNext(ws);
+			default:
+				ws.send("\n-- chunk\n")
+				return true;
+			}
+		}
+
+		var stream = function () {
+			if (!streamNext(this.ws)) {
+				return
+			}
+
+			var offsetEnd = streamData.offset + streamData.slicesize
+			if (offsetEnd > streamData.files[streamData.i].size) {
+				offsetEnd = streamData.files[streamData.i].size
+			}
+
+			this.ws.send(streamData.files[streamData.i].slice(streamData.offset, offsetEnd))
+			streamData.offset = offsetEnd
+		}
 
 		var disconnect = function () {
 			if (this.connected) {
