@@ -66,7 +66,7 @@
 			return context[func];
 		}
 
-		var newConnection = function (addr, debug) {
+		var NewConnection = function (addr, debug) {
 			this.addr = addr
 			this.debug = debug
 			this.connected = false
@@ -86,8 +86,8 @@
 			this.streamNext = streamNext
 		}
 
-		newConnection.prototype = {
-			constructor: newConnection,
+		NewConnection.prototype = {
+			constructor: NewConnection,
 
 			onConnect: function (evt) {
 				this.connected = true
@@ -129,14 +129,17 @@
 					console.warn("rattle: field 'To'(target function) is not filled")
 					return;
 				}
+				var msg = {}
+				msg.to = to
+				msg.type = "json"
 
-				if (data == undefined) {
-					data = {}
+				if (data != undefined) {
+					msg.json = data
 				}
 
-				if (this.debug) console.log("rattle: Send message to: " + to + " with data:", data)
+				if (this.debug) console.log("rattle: Send message to: " + to + " with data:", JSON.stringify(data))
 
-				this.ws.send(to + " json " + JSON.stringify(data) + "\n")
+				this.ws.send(JSON.stringify(msg) + "\n")
 			},
 
 			file: function (to, input, userdata) {
@@ -149,6 +152,10 @@
 				streamData.files = input.files
 				streamData.userdata = userdata
 				streamData.current = 0
+				streamData.offset = 0
+				streamData.i = 0
+
+				if (this.debug) console.log("rattle: open stream", streamData)
 
 				this.stream()
 			},
@@ -171,24 +178,36 @@
 			switch (streamData.offset) {
 			case 0:
 				// console.log(this)
+				var msg = {
+					to: streamData.to,
+					type: "stream",
+					json: streamData.userdata,
+					stream: {
+						name: streamData.files[streamData.i].name,
+						size: streamData.files[streamData.i].size,
+						slicesize: streamData.slicesize
+					}
+				}
 
-				ws.send(streamData.to + " stream " + JSON.stringify(streamData.userdata) + " " + JSON.stringify({
-					name: streamData.files[streamData.i].name,
-					size: streamData.files[streamData.i].size,
-					slicesize: streamData.slicesize
-				}) + "\n")
+				ws.send(JSON.stringify(msg) + "\n")
+
+				// ws.send(streamData.to + " stream " + JSON.stringify(streamData.userdata) + " " + JSON.stringify({
+				// 	name: streamData.files[streamData.i].name,
+				// 	size: streamData.files[streamData.i].size,
+				// 	slicesize: streamData.slicesize
+				// }) + "\n")
 
 				return true;
 
 			case streamData.files[streamData.i].size:
-				ws.send("\n-- finish\n")
+				ws.send("\n{\"type\":\"finish\"}\n")
 
 				streamData.offset = 0
 				streamData.i++
 
 				return streamNext(ws);
 			default:
-				ws.send("\n-- chunk\n")
+				ws.send("\n{\"type\":\"chunk\"}\n")
 				return true;
 			}
 		}
@@ -197,6 +216,8 @@
 			if (!streamNext(this.ws)) {
 				return
 			}
+
+			if (this.debug) console.log("rattle: send chunk ", streamData)
 
 			var offsetEnd = streamData.offset + streamData.slicesize
 			if (offsetEnd > streamData.files[streamData.i].size) {
@@ -224,7 +245,7 @@
 		}
 
 		global.rattle = {
-			newConnection: newConnection
+			NewConnection: NewConnection
 		}
 
 	} else {

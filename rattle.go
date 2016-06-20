@@ -65,13 +65,21 @@ func wshandler(ws *websocket.Conn) {
 	scanner := bufio.NewScanner(ws)
 	// SCANNER:
 	for scanner.Scan() && c != nil {
-		to, typ, jsondata, streamdata := c.parsemsg(scanner.Bytes())
-		switch typ {
+		// log.Println(scanner.Text())
+
+		inmsg, err := c.parsemsg(scanner.Bytes())
+		if err != nil {
+			if Debug {
+				log.Println(err)
+			}
+			continue
+		}
+		switch inmsg.Type {
 		case "json":
 			// log.Println(string(to), string(jsondata))
-			go c.request(to, jsondata)
+			go c.request(inmsg)
 		case "stream":
-			c.stream(to, jsondata, streamdata)
+			c.stream(inmsg)
 		}
 	}
 
@@ -87,10 +95,10 @@ type File struct {
 	SliceSize int `json:"slicesize"`
 }
 
-func (c *Conn) stream(to, jsondata, streamdata []byte) {
+func (c *Conn) stream(inmsg *Inmsg) {
 	c.WS.Write([]byte("stream --"))
 
-	err := json.Unmarshal(streamdata, &c.File)
+	err := json.Unmarshal(inmsg.Stream, &c.File)
 	if err != nil {
 		if Debug {
 			log.Println("rattle: failed unmarshal file header: " + err.Error())
@@ -105,50 +113,68 @@ STREAM:
 		line := make([]byte, c.File.SliceSize)
 		n, err := c.WS.Read(line)
 		line = line[:n]
+		log.Println(string(line[:100]))
 
-		_, typ, _, _ := c.parsemsg(line)
-		switch typ {
-		case "chunk":
-			// log.Println("CHUNK")
-			c.WS.Write([]byte("stream --"))
-
-		case "finish":
-			break STREAM
-
-		default:
-			if !bytes.Equal(line, []byte("\n")) {
-				c.File.Buffer.Write(line)
+		inmsg, _ := c.parsemsg(line)
+		// if err != nil {
+		// 	if Debug {
+		// 		log.Println(err)
+		// 	}
+		// 	continue
+		// }
+		if inmsg != nil {
+			switch inmsg.Type {
+			case "chunk":
+				log.Println("CHUNK")
+				c.WS.Write([]byte("stream --"))
+				continue STREAM
+			case "finish":
+				break STREAM
 			}
+		} //else {
+
+		if !bytes.Equal(line, []byte("\n")) {
+			c.File.Buffer.Write(line)
 		}
+		// }
 
 		if err != nil {
 			break STREAM
 		}
 	}
 
-	go c.request(to, jsondata)
+	go c.request(inmsg)
 }
 
 // var reg = regexp.MustCompile("(?i)^[a-z0-9]+\\.[a-z0-9]+$") //
-var delim = []byte(" ")
+// var delim = []byte(" ")
+
+type Inmsg struct {
+	To     string
+	Type   string
+	JSON   json.RawMessage
+	Stream json.RawMessage
+}
 
 //parsemsg parse []byte message to type Message
-func (c *Conn) parsemsg(bmsg []byte) (to []byte, typ string, jsondata []byte, streamdata []byte) {
-	s := bytes.Split(bytes.Trim(bmsg, "\r\n "), delim)
-	if len(s) < 2 {
-		return
-	}
-
-	to = s[0]
-	typ = string(s[1])
-	if len(s) > 2 {
-		jsondata = s[2]
-	}
-	if len(s) > 3 {
-		streamdata = s[3]
-	}
-
+func (c *Conn) parsemsg(bmsg []byte) (msg *Inmsg, err error) {
+	err = json.Unmarshal(bmsg, &msg)
 	return
+	// s := bytes.Split(bytes.Trim(bmsg, "\r\n "), delim)
+	// if len(s) < 2 {
+	// 	return
+	// }
+
+	// to = s[0]
+	// typ = string(s[1])
+	// if len(s) > 2 {
+	// 	jsondata = s[2]
+	// }
+	// if len(s) > 3 {
+	// 	streamdata = s[3]
+	// }
+
+	// return
 }
 
 func GetBoundary() []byte {
@@ -195,7 +221,7 @@ type Conn struct {
 //  1) parse message
 //  2) call specified method of controller
 //  3) and if a answer is returned, then write it to connection
-func (c *Conn) request(to []byte, data []byte) {
+func (c *Conn) request(inmsg *Inmsg) {
 	// fmt.Println(string(bmsg))
 
 	// msg, err := c.parsemsg(bmsg)
@@ -205,11 +231,11 @@ func (c *Conn) request(to []byte, data []byte) {
 	// 	}
 	// 	return
 	// }
-	msg := &Message{To: to, Data: data, conn: c}
-	m, err := c.call(msg)
+	// msg := &Message{To: inmsg.To, Data: inmsg.JSON, conn: c}
+	m, err := c.call(inmsg)
 	if err != nil {
 		if Debug {
-			log.Println(err, "get msg to:", string(to), "with data: ", string(data))
+			log.Println(err, "get msg to:", inmsg.To, "with data: ", inmsg.JSON)
 		}
 		return
 	}
@@ -232,16 +258,17 @@ type methodRPC struct {
 }
 
 //splitRPC function split string with controller and method to RPCMethod
-func splitRPC(rpc []byte) (*methodRPC, error) {
+func splitRPC(funcname string) (*methodRPC, error) {
 	r := &methodRPC{}
 
-	splitted := bytes.SplitN(rpc, []byte("."), 2)
+	splitted := strings.SplitN(funcname, ".", 2)
+	// splitted := bytes.SplitN(rpc, []byte("."), 2)
 	if len(splitted) != 2 {
 		return r, errors.New("failed split rpc request")
 	}
 
-	r.Controller = strings.Title(string(splitted[0]))
-	r.Method = strings.Title(string(splitted[1]))
+	r.Controller = strings.Title(splitted[0])
+	r.Method = strings.Title(splitted[1])
 
 	return r, nil
 }
@@ -252,7 +279,7 @@ func splitRPC(rpc []byte) (*methodRPC, error) {
 // }
 
 //Call method by name
-func (c *Conn) call(m *Message) (*Message, error) {
+func (c *Conn) call(m *Inmsg) (*Message, error) {
 	rpc, err := splitRPC(m.To)
 	if err != nil {
 		return nil, err
@@ -270,9 +297,15 @@ func (c *Conn) call(m *Message) (*Message, error) {
 		return nil, errors.New("404 page not found")
 	}
 
-	if len(m.Data) > 1 {
-		json.Unmarshal(m.Data, &conInterface)
-		c.Raw = m.Data
+	if len(m.JSON) > 1 {
+		// conInterface = nil
+		// controller.Set(reflect.ValueOf(m.JSON))
+		// log.Println(m.JSON, string(m.JSON))
+		json.Unmarshal(m.JSON, &conInterface)
+		// if err != nil && Debug {
+		// 	log.Println(err)
+		// }
+		c.Raw = m.JSON
 	}
 
 	//call controller method
