@@ -1,6 +1,6 @@
 'use strict';
 
-var conn = new rattle.newConnection("ws://127.0.0.1:8080/ws", true); //addr, debug
+var conn = new rattle.NewConnection("ws://127.0.0.1:8080/ws", true); //addr, debug
 
 console.log(conn)
 conn.event("onConnect", function (evt) {
@@ -9,7 +9,6 @@ conn.event("onConnect", function (evt) {
 	conn.send("Main.Index")
 })
 
-//for this case, rattle correct fill field `From` 
 var test = {
 	Send: function () {
 		var data = {};
@@ -30,8 +29,6 @@ var test = {
 }
 
 function toggle() {
-	console.log(conn)
-
 	if (conn.connected) {
 		conn.disconnect()
 	} else {

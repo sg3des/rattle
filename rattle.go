@@ -113,7 +113,7 @@ STREAM:
 		line := make([]byte, c.File.SliceSize)
 		n, err := c.WS.Read(line)
 		line = line[:n]
-		log.Println(string(line[:100]))
+		// log.Println(string(line[:100]))
 
 		inmsg, _ := c.parsemsg(line)
 		// if err != nil {
@@ -346,28 +346,6 @@ type Message struct {
 	Data []byte
 }
 
-// var reg = regexp.MustCompile("(?i)^[a-z0-9]+\\.[a-z0-9]+$")
-
-// //parsemsg parse []byte message to type Message
-// func (c *Conn) parsemsg(bmsg []byte) (*Message, error) {
-// 	splitted := bytes.SplitN(bmsg, []byte(" "), 2)
-// 	if len(splitted) == 0 {
-// 		return nil, errors.New("failed incoming message")
-// 	}
-
-// 	m := &Message{To: bytes.Trim(splitted[0], " \n\r")}
-// 	if !reg.Match(m.To) {
-// 		return m, errors.New("incoming message contains invalid characters")
-// 	}
-
-// 	if len(splitted) == 2 {
-// 		m.Data = bytes.Trim(splitted[1], " \n\r")
-// 		c.Body = m.Data
-// 	}
-
-// 	return m, nil
-// }
-
 //Bytes convert Message type to []byte, for write to socket
 func (m *Message) Bytes() (bmsg []byte) {
 	buf := bytes.NewBuffer(bmsg)
@@ -377,7 +355,7 @@ func (m *Message) Bytes() (bmsg []byte) {
 	buf.Write(m.Data)
 
 	bmsg = buf.Bytes()
-	bmsg = regexp.MustCompile("\n*$").ReplaceAll(bmsg, []byte("\n"))
+	bmsg = regexp.MustCompile("\n+$").ReplaceAll(bmsg, []byte("\n"))
 
 	return
 }
@@ -385,9 +363,6 @@ func (m *Message) Bytes() (bmsg []byte) {
 //Send message to connection
 func (m *Message) Send() error {
 	_, err := m.conn.WS.Write(m.Bytes())
-	// if err != nil {
-	// 	m.conn.Disconnect()
-	// }
 	return err
 }
 

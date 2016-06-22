@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -22,7 +23,7 @@ func main() {
 	rattle.SetOnDisconnect(OnDisconnect)
 
 	//bind controllers and get handler
-	wshandle := rattle.SetControllers(&Main{})
+	wshandle := rattle.SetControllers(&Main{}, &Upload{})
 	http.Handle("/ws", wshandle)
 
 	println("web server listen on 127.0.0.1:8080")
@@ -70,9 +71,16 @@ func (c *Main) Timer(r *rattle.Conn) {
 	}
 }
 
-func (c *Main) File(r *rattle.Conn) {
+type Upload struct {
+	Result string
+}
+
+func (c *Upload) File(r *rattle.Conn) *rattle.Message {
+	log.Println(c)
+
 	log.Println("incoming file:", r.File.Name, "size:", r.File.Buffer.Len())
 	ioutil.WriteFile(r.File.Name, r.File.Buffer.Bytes(), 0644)
+	return r.NewMessage("=#"+c.Result, []byte(fmt.Sprintf("file `%s` uploaded", r.File.Name)))
 }
 
 //OnConnect handler function for event connection

@@ -136,10 +136,9 @@ var test = new constructorExample()
 	BenchmarkEmptyRequests-8	  300000	      4196 ns/op
 
 
-
-
 ## TODO
 
+* streaming upload files;
 * need more test for backend;
 * need tests for frontend;
 * and many more other - this is yet a concept!
