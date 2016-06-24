@@ -139,6 +139,11 @@
 
 				if (this.debug) console.log("rattle: Send message to: " + to + " with data:", JSON.stringify(data))
 
+				//reconnect if current not connected
+				if (this.ws.readyState == 3) {
+					this.connect()
+				}
+
 				this.ws.send(JSON.stringify(msg) + "\n")
 			},
 
@@ -222,6 +227,11 @@
 			var offsetEnd = streamData.offset + streamData.slicesize
 			if (offsetEnd > streamData.files[streamData.i].size) {
 				offsetEnd = streamData.files[streamData.i].size
+			}
+
+			//reconnect if current not connected
+			if (this.ws.readyState == 3) {
+				this.connect()
 			}
 
 			this.ws.send(streamData.files[streamData.i].slice(streamData.offset, offsetEnd))

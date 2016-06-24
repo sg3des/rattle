@@ -20,9 +20,12 @@ var (
 // fake controllers for tests
 type FakeController struct {
 	Name string
+	Num  int
+	Bool bool
 }
 
 func (c *FakeController) FakeMethod(r *Conn) *Message {
+	log.Println(c)
 	// fmt.Println("recieve message:", c)
 	r.NewMessage("tovoid0").Send()
 	return r.NewMessage("tovoid1")
@@ -82,10 +85,20 @@ func TestRequest(t *testing.T) {
 		t.Error(err)
 	}
 
-	msg := &Message{To: []byte("FakeController.FakeMethod"), Data: []byte(`{"Name":"testname"}`)}
-	if _, err := conn.Write(msg.Bytes()); err != nil {
+	if _, err := conn.Write([]byte(`{"to":"FakeController.FakeMethod","type":"json","json":{"name":"testname"}}` + "\n")); err != nil {
 		t.Error(err)
 	}
+
+	if _, err := conn.Write([]byte(`{"to":"FakeController.FakeMethod","type":"json","json":{"num":1}}` + "\n")); err != nil {
+		t.Error(err)
+	}
+
+	if _, err := conn.Write([]byte(`{"to":"FakeController.FakeMethod","type":"json","json":{"bool":true}}` + "\n")); err != nil {
+		t.Error(err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
 }
 
 //More tests are needed

@@ -63,10 +63,7 @@ func wshandler(ws *websocket.Conn) {
 	c := newConnection(ws)
 
 	scanner := bufio.NewScanner(ws)
-	// SCANNER:
 	for scanner.Scan() && c != nil {
-		// log.Println(scanner.Text())
-
 		inmsg, err := c.parsemsg(scanner.Bytes())
 		if err != nil {
 			if Debug {
@@ -76,8 +73,8 @@ func wshandler(ws *websocket.Conn) {
 		}
 		switch inmsg.Type {
 		case "json":
-			// log.Println(string(to), string(jsondata))
-			go c.request(inmsg)
+
+			c.request(inmsg) //removed prefix go - sadly, but multi-threaded has a lot of problems. if at the same time cause the same method incoming data will mix
 		case "stream":
 			c.stream(inmsg)
 		}
@@ -125,7 +122,6 @@ STREAM:
 		if inmsg != nil {
 			switch inmsg.Type {
 			case "chunk":
-				log.Println("CHUNK")
 				c.WS.Write([]byte("stream --"))
 				continue STREAM
 			case "finish":
@@ -146,9 +142,6 @@ STREAM:
 	go c.request(inmsg)
 }
 
-// var reg = regexp.MustCompile("(?i)^[a-z0-9]+\\.[a-z0-9]+$") //
-// var delim = []byte(" ")
-
 type Inmsg struct {
 	To     string
 	Type   string
@@ -160,21 +153,6 @@ type Inmsg struct {
 func (c *Conn) parsemsg(bmsg []byte) (msg *Inmsg, err error) {
 	err = json.Unmarshal(bmsg, &msg)
 	return
-	// s := bytes.Split(bytes.Trim(bmsg, "\r\n "), delim)
-	// if len(s) < 2 {
-	// 	return
-	// }
-
-	// to = s[0]
-	// typ = string(s[1])
-	// if len(s) > 2 {
-	// 	jsondata = s[2]
-	// }
-	// if len(s) > 3 {
-	// 	streamdata = s[3]
-	// }
-
-	// return
 }
 
 func GetBoundary() []byte {
@@ -224,14 +202,6 @@ type Conn struct {
 func (c *Conn) request(inmsg *Inmsg) {
 	// fmt.Println(string(bmsg))
 
-	// msg, err := c.parsemsg(bmsg)
-	// if err != nil {
-	// 	if Debug {
-	// 		log.Println(err, "msg:", string(bmsg))
-	// 	}
-	// 	return
-	// }
-	// msg := &Message{To: inmsg.To, Data: inmsg.JSON, conn: c}
 	m, err := c.call(inmsg)
 	if err != nil {
 		if Debug {
@@ -273,11 +243,6 @@ func splitRPC(funcname string) (*methodRPC, error) {
 	return r, nil
 }
 
-// //Join rpc to one []byte line
-// func (rpc *methodRPC) join() []byte {
-// 	return []byte(fmt.Sprintf("%s.%s", rpc.Controller, rpc.Method))
-// }
-
 //Call method by name
 func (c *Conn) call(m *Inmsg) (*Message, error) {
 	rpc, err := splitRPC(m.To)
@@ -297,14 +262,10 @@ func (c *Conn) call(m *Inmsg) (*Message, error) {
 		return nil, errors.New("404 page not found")
 	}
 
+	clearStruct(controller) // otherwise the new data fall over the previous
+
 	if len(m.JSON) > 1 {
-		// conInterface = nil
-		// controller.Set(reflect.ValueOf(m.JSON))
-		// log.Println(m.JSON, string(m.JSON))
 		json.Unmarshal(m.JSON, &conInterface)
-		// if err != nil && Debug {
-		// 	log.Println(err)
-		// }
 		c.Raw = m.JSON
 	}
 
@@ -320,6 +281,20 @@ func (c *Conn) call(m *Inmsg) (*Message, error) {
 	}
 
 	return a, nil
+}
+
+func clearStruct(controller reflect.Value) {
+	//clear struct
+	for i := 0; i < controller.Elem().NumField(); i++ {
+		switch controller.Elem().Field(i).Type().String() {
+		case "string":
+			controller.Elem().Field(i).Set(reflect.ValueOf(""))
+		case "int":
+			controller.Elem().Field(i).Set(reflect.ValueOf(0))
+		case "bool":
+			controller.Elem().Field(i).Set(reflect.ValueOf(false))
+		}
+	}
 }
 
 //NewMessage create answer message
@@ -362,6 +337,9 @@ func (m *Message) Bytes() (bmsg []byte) {
 
 //Send message to connection
 func (m *Message) Send() error {
+	if m.conn == nil || m.conn.WS == nil {
+		return errors.New("connection is nil")
+	}
 	_, err := m.conn.WS.Write(m.Bytes())
 	return err
 }
@@ -369,9 +347,8 @@ func (m *Message) Send() error {
 //Broadcast send one message for all available connections(users)
 func Broadcast(m *Message) {
 	for conn := range Connections {
-		if conn != nil {
+		if conn != nil && conn.WS != nil {
 			conn.WS.Write(m.Bytes())
-			// conn.Write(m.Bytes())
 		}
 	}
 }
