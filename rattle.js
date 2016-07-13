@@ -6,7 +6,7 @@
 		var call = function (to, data) {
 			if (to == "" || to == undefined) return;
 
-			if ("=+".indexOf(to[0]) != -1) {
+			if ("=+@".indexOf(to[0]) != -1) {
 				callElement(to, data)
 			} else {
 				callFunction(to, data)
@@ -29,10 +29,14 @@
 				return;
 			}
 
-			if (element.tagName == "INPUT" || element.tagName == "TEXTAREA") {
-				element.value = to[0] == "=" ? data : element.value + data
+			if (to[0] == "@") {
+				element.outerHTML = data
 			} else {
-				element.innerHTML = to[0] == "=" ? data : element.innerHTML + data
+				if (element.tagName == "INPUT" || element.tagName == "TEXTAREA") {
+					element.value = to[0] == "=" ? data : element.value + data
+				} else {
+					element.innerHTML = to[0] == "=" ? data : element.innerHTML + data
+				}
 			}
 		}
 
@@ -103,8 +107,8 @@
 
 			onMessage: function (incomingData) {
 				var splitted = incomingData.data.split(' '),
-					to = splitted[0],
-					data = splitted.slice(1, splitted.length).join(" ")
+					to = splitted[0].trim(),
+					data = splitted.slice(1, splitted.length).join(" ").trim()
 
 				if (to == "stream") {
 					this.stream()
@@ -129,8 +133,10 @@
 					console.warn("rattle: field 'To'(target function) is not filled")
 					return;
 				}
+
 				var msg = {}
 				msg.to = to
+				msg.url = window.location.href
 				msg.type = "json"
 
 				if (data != undefined) {
@@ -154,6 +160,7 @@
 				}
 
 				streamData.to = to
+				streamData.url = window.location.href
 				streamData.files = input.files
 				streamData.userdata = userdata
 				streamData.current = 0
@@ -168,6 +175,7 @@
 
 		var streamData = {
 			to: "",
+			url: "",
 			files: "",
 			userdata: {},
 			i: 0,
@@ -185,6 +193,7 @@
 				// console.log(this)
 				var msg = {
 					to: streamData.to,
+					url: window.location.href,
 					type: "stream",
 					json: streamData.userdata,
 					stream: {

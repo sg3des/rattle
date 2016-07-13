@@ -8,6 +8,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -83,6 +84,7 @@ func wshandler(ws *websocket.Conn) {
 	c.Disconnect()
 }
 
+//File structure
 type File struct {
 	Name string `json:"name"`
 	Size int    `json:"size"`
@@ -142,8 +144,10 @@ STREAM:
 	go c.request(inmsg)
 }
 
+//Inmsg - incoming message structure
 type Inmsg struct {
 	To     string
+	URL    string
 	Type   string
 	JSON   json.RawMessage
 	Stream json.RawMessage
@@ -155,6 +159,7 @@ func (c *Conn) parsemsg(bmsg []byte) (msg *Inmsg, err error) {
 	return
 }
 
+//GetBoundary DEPRECATED
 func GetBoundary() []byte {
 	return []byte("--" + multipart.NewWriter(bytes.NewBuffer([]byte{})).Boundary()[:16] + "--")
 }
@@ -191,6 +196,7 @@ type Conn struct {
 	WS   *websocket.Conn
 	File *File
 	Raw  []byte
+	URL  *url.URL
 
 	boundary []byte
 }
@@ -269,6 +275,11 @@ func (c *Conn) call(m *Inmsg) (*Message, error) {
 		c.Raw = m.JSON
 	}
 
+	c.URL, err = url.Parse(m.URL)
+	if err != nil {
+		return nil, err
+	}
+
 	//call controller method
 	refAnswer := method.Call([]reflect.Value{reflect.ValueOf(c)})
 	if len(refAnswer) == 0 || refAnswer[0].Interface() == nil {
@@ -284,17 +295,19 @@ func (c *Conn) call(m *Inmsg) (*Message, error) {
 }
 
 func clearStruct(controller reflect.Value) {
+	controller.Elem().Set(reflect.Zero(controller.Elem().Type()))
+
 	//clear struct
-	for i := 0; i < controller.Elem().NumField(); i++ {
-		switch controller.Elem().Field(i).Type().String() {
-		case "string":
-			controller.Elem().Field(i).Set(reflect.ValueOf(""))
-		case "int":
-			controller.Elem().Field(i).Set(reflect.ValueOf(0))
-		case "bool":
-			controller.Elem().Field(i).Set(reflect.ValueOf(false))
-		}
-	}
+	// for i := 0; i < controller.Elem().NumField(); i++ {
+	// 	switch controller.Elem().Field(i).Type().String() {
+	// 	case "string":
+	// 		controller.Elem().Field(i).Set(reflect.ValueOf(""))
+	// 	case "int":
+	// 		controller.Elem().Field(i).Set(reflect.ValueOf(0))
+	// 	case "bool":
+	// 		controller.Elem().Field(i).Set(reflect.ValueOf(false))
+	// 	}
+	// }
 }
 
 //NewMessage create answer message
@@ -304,7 +317,7 @@ func (c *Conn) NewMessage(to string, data ...[]byte) *Message {
 
 	if len(data) > 0 {
 		msg.Data = data[0]
-	} else if c.W.Len() > 0 {
+	} else if c.W != nil && c.W.Len() > 0 {
 		msg.Data = c.W.Bytes()
 		c.W.Truncate(0)
 	}
