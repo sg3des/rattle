@@ -5,83 +5,155 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
-	"mime/multipart"
 	"net/http"
-	"net/url"
-	"reflect"
-	"regexp"
-	"strings"
 
+	"github.com/sg3des/bytetree"
 	"golang.org/x/net/websocket"
 )
 
-var (
-	//Debug mode enable error output
-	Debug bool
+var Debug bool
+
+type Rattle struct {
 	//Connections map contains all available web socket connections
-	Connections = make(map[*Conn]bool)
-	//Controllers contains name and interface link on controller
-	Controllers = make(map[string]interface{})
+	Connections *bytetree.Tree
+
+	//Routes contains name and interface link on controller
+	Routes *bytetree.Tree
 
 	//events
-	onConnect    func(*Conn)
-	onDisconnect func(*Conn)
-)
+	onConnect    Handler
+	onDisconnect Handler
+}
+
+//NewRattle initialize new rattle instance
+func NewRattle() *Rattle {
+	r := &Rattle{
+		Connections: bytetree.NewTree(),
+		Routes:      bytetree.NewTree(),
+	}
+
+	return r
+}
+
+//Handler method type
+type Handler func(*Request)
+
+//AddRoute handler method by name
+func (r *Rattle) AddRoute(name string, h Handler) {
+	r.Routes.GrowLeaf([]byte(name), h)
+}
 
 //SetOnConnect bind event onconnect
-func SetOnConnect(f func(*Conn)) {
-	onConnect = f
+func (r *Rattle) SetOnConnect(f Handler) {
+	r.onConnect = f
 }
 
 //SetOnDisconnect bind event onDisconnect
-func SetOnDisconnect(f func(*Conn)) {
-	onDisconnect = f
+func (r *Rattle) SetOnDisconnect(f Handler) {
+	r.onDisconnect = f
 }
 
-//SetControllers bind controllers
-func SetControllers(userContollers ...interface{}) http.Handler {
-	for _, c := range userContollers {
-		Controllers[getControllerName(c)] = c
-	}
-
-	if Debug {
-		log.SetFlags(log.Lshortfile)
-	}
-
-	return websocket.Handler(wshandler)
-}
-
-//getControllerName determine name of struct through reflect
-func getControllerName(c interface{}) string {
-	constring := reflect.ValueOf(c).String()
-	f := regexp.MustCompile("\\.([A-Za-z0-9]+) ").FindString(constring)
-	return strings.Trim(f, ". ")
+//Handler return http.Handler with websocket
+func (r *Rattle) Handler() http.Handler {
+	return websocket.Handler(r.wshandler)
 }
 
 //wshandler is handler for websocket connections
-func wshandler(ws *websocket.Conn) {
-	c := newConnection(ws)
+func (r *Rattle) wshandler(ws *websocket.Conn) {
+	c := r.newСonnection(ws)
+	if Debug {
+		log.Println("new connection:", string(c.key))
+	}
 
 	scanner := bufio.NewScanner(ws)
 	for scanner.Scan() && c != nil {
-		inmsg, err := c.parsemsg(scanner.Bytes())
-		if err != nil {
-			if Debug {
-				log.Println(err)
-			}
-			continue
-		}
-		switch inmsg.Type {
-		case "json":
-
-			c.request(inmsg) //removed prefix go - sadly, but multi-threaded has a lot of problems. if at the same time cause the same method incoming data will mix
-		case "stream":
-			c.stream(inmsg)
-		}
+		r.call(c, scanner.Bytes())
 	}
 
-	c.Disconnect()
+	r.Disconnect(c)
+}
+
+func (r *Rattle) call(c *Connection, data []byte) {
+	req, err := r.parseRequest(data)
+	if err != nil {
+		if Debug {
+			log.Println(err)
+		}
+		return
+	}
+
+	req.conn = c
+
+	if Debug {
+		log.Printf("request: %s %s", req.To, req.Data)
+	}
+
+	switch req.Type {
+	case "stream":
+		err = r.stream(req)
+	default:
+		err = r.request(req)
+	}
+
+	if err != nil && Debug {
+		log.Println(err)
+	}
+}
+
+//Connection is main struct contains websocket.Conn
+type Connection struct {
+	key []byte
+	w   *bytes.Buffer
+	ws  *websocket.Conn
+}
+
+func (r *Rattle) newСonnection(ws *websocket.Conn) *Connection {
+	key := []byte(fmt.Sprintf("%p", ws))
+	if v, ok := r.Connections.LookupLeaf(key); ok {
+
+		return v.(*Connection)
+	}
+
+	c := &Connection{
+		key: key,
+		ws:  ws,
+		w:   bytes.NewBuffer([]byte{}),
+	}
+
+	r.Connections.GrowLeaf(key, c)
+
+	if r.onConnect != nil {
+		go r.onConnect(&Request{conn: c})
+	}
+
+	return c
+}
+
+//Disconnect end the current connection
+func (r *Rattle) Disconnect(c *Connection) {
+	if c != nil {
+		if r.onDisconnect != nil {
+			r.onDisconnect(&Request{conn: c})
+		}
+
+		r.Connections.CutLeaf(c.key)
+		c.ws.Close()
+		c = nil
+	}
+}
+
+type Request struct {
+	conn *Connection
+
+	To     string
+	Type   string
+	URL    string `json:"url"`
+	Data   json.RawMessage
+	Stream json.RawMessage
+
+	File *File
 }
 
 //File structure
@@ -94,45 +166,74 @@ type File struct {
 	SliceSize int `json:"slicesize"`
 }
 
-func (c *Conn) stream(inmsg *Inmsg) {
-	c.WS.Write([]byte("stream --"))
+func (req *Request) DecodeTo(v interface{}) error {
+	return json.Unmarshal(req.Data, v)
+}
 
-	err := json.Unmarshal(inmsg.Stream, &c.File)
-	if err != nil {
-		if Debug {
-			log.Println("rattle: failed unmarshal file header: " + err.Error())
-		}
-		return
+//parsemsg parse []byte message to type Message
+func (r *Rattle) parseRequest(buf []byte) (req *Request, err error) {
+	err = json.Unmarshal(buf, &req)
+	return
+}
+
+//Request is main function, takes connection and raw incoming message
+func (r *Rattle) request(req *Request) error {
+	v, ok := r.Routes.LookupLeaf([]byte(req.To))
+	if !ok {
+		return errors.New("404 page not found")
 	}
 
-	c.File.Buffer = bytes.NewBuffer([]byte{})
+	v.(Handler)(req)
+	return nil
+}
+
+func (r *Rattle) stream(req *Request) error {
+	req.conn.ws.Write([]byte("stream --"))
+
+	err := json.Unmarshal(req.Stream, &req.File)
+	if err != nil {
+		if Debug {
+			log.Println("rattle: failed unmarshal file header:", err)
+		}
+		return err
+	}
+
+	req.File.Buffer = bytes.NewBuffer([]byte{})
+	log.Println(req.File)
 
 STREAM:
 	for {
-		line := make([]byte, c.File.SliceSize)
-		n, err := c.WS.Read(line)
-		line = line[:n]
-		// log.Println(string(line[:100]))
+		line := make([]byte, req.File.SliceSize)
+		n, err := req.conn.ws.Read(line)
+		if err != nil {
+			if Debug {
+				log.Println(err)
+			}
+			return err
 
-		inmsg, _ := c.parsemsg(line)
+		}
+		line = line[:n]
+
+		rr, err := r.parseRequest(line)
 		// if err != nil {
 		// 	if Debug {
 		// 		log.Println(err)
 		// 	}
 		// 	continue
 		// }
-		if inmsg != nil {
-			switch inmsg.Type {
+
+		if err == nil {
+			switch rr.Type {
 			case "chunk":
-				c.WS.Write([]byte("stream --"))
+				req.conn.ws.Write([]byte("stream --"))
 				continue STREAM
 			case "finish":
 				break STREAM
 			}
-		} //else {
+		}
 
 		if !bytes.Equal(line, []byte("\n")) {
-			c.File.Buffer.Write(line)
+			req.File.Buffer.Write(line)
 		}
 		// }
 
@@ -141,197 +242,30 @@ STREAM:
 		}
 	}
 
-	go c.request(inmsg)
-}
-
-//Inmsg - incoming message structure
-type Inmsg struct {
-	To     string
-	URL    string
-	Type   string
-	JSON   json.RawMessage
-	Stream json.RawMessage
-}
-
-//parsemsg parse []byte message to type Message
-func (c *Conn) parsemsg(bmsg []byte) (msg *Inmsg, err error) {
-	err = json.Unmarshal(bmsg, &msg)
-	return
-}
-
-//GetBoundary DEPRECATED
-func GetBoundary() []byte {
-	return []byte("--" + multipart.NewWriter(bytes.NewBuffer([]byte{})).Boundary()[:16] + "--")
-}
-
-//newConnection
-func newConnection(ws *websocket.Conn) *Conn {
-	c := &Conn{WS: ws, W: bytes.NewBuffer([]byte{}), boundary: GetBoundary()}
-
-	Connections[c] = true
-	if onConnect != nil {
-		onConnect(c)
-	}
-
-	return c
-}
-
-//Disconnect end the current connection
-func (c *Conn) Disconnect() {
-	if c != nil {
-		c.WS.Close()
-
-		if onDisconnect != nil {
-			onDisconnect(c)
-		}
-
-		delete(Connections, c)
-		c = nil
-	}
-}
-
-//Conn is main struct contains websocket.Conn
-type Conn struct {
-	W    *bytes.Buffer
-	WS   *websocket.Conn
-	File *File
-	Raw  []byte
-	URL  *url.URL
-
-	boundary []byte
-}
-
-//Request is main function, takes connection and raw incoming message
-//  1) parse message
-//  2) call specified method of controller
-//  3) and if a answer is returned, then write it to connection
-func (c *Conn) request(inmsg *Inmsg) {
-	// fmt.Println(string(bmsg))
-
-	m, err := c.call(inmsg)
-	if err != nil {
-		if Debug {
-			log.Println(err, "get msg to:", inmsg.To, "with data: ", inmsg.JSON)
-		}
-		return
-	}
-	if m != nil {
-		if err := m.Send(); err != nil {
-			if Debug {
-				log.Println(err, "send msg to:", string(m.To), "with data: ", string(m.Data))
-			}
-
-			// c.Disconnect()
-		}
-	}
-
-}
-
-//methodRPC contains name of controller and method
-type methodRPC struct {
-	Controller string
-	Method     string
-}
-
-//splitRPC function split string with controller and method to RPCMethod
-func splitRPC(funcname string) (*methodRPC, error) {
-	r := &methodRPC{}
-
-	splitted := strings.SplitN(funcname, ".", 2)
-	// splitted := bytes.SplitN(rpc, []byte("."), 2)
-	if len(splitted) != 2 {
-		return r, errors.New("failed split rpc request")
-	}
-
-	r.Controller = strings.Title(splitted[0])
-	r.Method = strings.Title(splitted[1])
-
-	return r, nil
-}
-
-//Call method by name
-func (c *Conn) call(m *Inmsg) (*Message, error) {
-	rpc, err := splitRPC(m.To)
-	if err != nil {
-		return nil, err
-	}
-
-	var conInterface interface{}
-	var ok bool
-	if conInterface, ok = Controllers[rpc.Controller]; !ok {
-		return nil, errors.New("404 page not found")
-	}
-
-	controller := reflect.ValueOf(conInterface)
-	method := controller.MethodByName(rpc.Method)
-	if !method.IsValid() {
-		return nil, errors.New("404 page not found")
-	}
-
-	clearStruct(controller) // otherwise the new data fall over the previous
-
-	if len(m.JSON) > 1 {
-		json.Unmarshal(m.JSON, &conInterface)
-		c.Raw = m.JSON
-	}
-
-	c.URL, err = url.Parse(m.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	//call controller method
-	refAnswer := method.Call([]reflect.Value{reflect.ValueOf(c)})
-	if len(refAnswer) == 0 || refAnswer[0].Interface() == nil {
-		return nil, nil
-	}
-
-	a := refAnswer[0].Interface().(*Message)
-	if a == nil {
-		return nil, nil
-	}
-
-	return a, nil
-}
-
-func clearStruct(controller reflect.Value) {
-	controller.Elem().Set(reflect.Zero(controller.Elem().Type()))
-
-	//clear struct
-	// for i := 0; i < controller.Elem().NumField(); i++ {
-	// 	switch controller.Elem().Field(i).Type().String() {
-	// 	case "string":
-	// 		controller.Elem().Field(i).Set(reflect.ValueOf(""))
-	// 	case "int":
-	// 		controller.Elem().Field(i).Set(reflect.ValueOf(0))
-	// 	case "bool":
-	// 		controller.Elem().Field(i).Set(reflect.ValueOf(false))
-	// 	}
-	// }
-}
-
-//NewMessage create answer message
-func (c *Conn) NewMessage(to string, data ...[]byte) *Message {
-	msg := &Message{To: []byte(to), conn: c}
-	// msg.conn = c
-
-	if len(data) > 0 {
-		msg.Data = data[0]
-	} else if c.W != nil && c.W.Len() > 0 {
-		msg.Data = c.W.Bytes()
-		c.W.Truncate(0)
-	}
-
-	return msg
+	return r.request(req)
 }
 
 //Message type:
 //  To - contains name of called function, must be filled!
 //  Data may contains payload in json format - for backend, or json,html or another for frontend, not necessary.
 type Message struct {
-	conn *Conn
+	conn *Connection
 	To   []byte
 	Data []byte
+}
+
+//NewMessage create answer message
+func (req *Request) NewMessage(to string, data []byte) *Message {
+	msg := &Message{
+		To:   []byte(to),
+		conn: req.conn,
+	}
+
+	if len(data) > 0 {
+		msg.Data = data
+	}
+
+	return msg
 }
 
 //Bytes convert Message type to []byte, for write to socket
@@ -343,25 +277,32 @@ func (m *Message) Bytes() (bmsg []byte) {
 	buf.Write(m.Data)
 
 	bmsg = buf.Bytes()
-	bmsg = regexp.MustCompile("\n+$").ReplaceAll(bmsg, []byte("\n"))
+	// bmsg = regexp.MustCompile("(?m)\n+$").ReplaceAll(bmsg, []byte("\n"))
 
 	return
 }
 
 //Send message to connection
 func (m *Message) Send() error {
-	if m.conn == nil || m.conn.WS == nil {
-		return errors.New("connection is nil")
+	if m.conn == nil || m.conn.ws == nil {
+		err := errors.New("connection is nil")
+		if Debug {
+			log.Println(err)
+		}
+		return err
 	}
-	_, err := m.conn.WS.Write(m.Bytes())
+	_, err := m.conn.ws.Write(m.Bytes())
+
+	if Debug {
+		log.Printf("send message to: %s with data: %s", m.To, m.Data)
+	}
+
 	return err
 }
 
 //Broadcast send one message for all available connections(users)
-func Broadcast(m *Message) {
-	for conn := range Connections {
-		if conn != nil && conn.WS != nil {
-			conn.WS.Write(m.Bytes())
-		}
+func (r *Rattle) Broadcast(m *Message) {
+	for _, v := range r.Connections.PickAllLeafs() {
+		v.(Connection).ws.Write(m.Bytes())
 	}
 }

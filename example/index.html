@@ -35,29 +35,20 @@
 		</style>
 	</head>
 	<body>
-
-		<!-- <label>connected:<input type="button" onclick="toggle()"></label> -->
-
-		<input type="checkbox" id='toggle' checked onclick="toggle()">
-		<label for="toggle">CONNECTED</label>
-
 		<a target='_blank' href='https://github.com/sg3des/rattle'><h1>RATTLE</h1></a>
 		<h3 id='description'></h3>
 		
-		<div id='timer' title='Just clock, but updated from backend'></div>
+		<div id='clock' title='Just clock, but updated from backend'></div>
 
-		<form>
-			<input type="text" id="text" placeholder="write here" oninput="test.Send()">
-			<input type="checkbox" id="json" checked onclick="test.Send()">
-			<label for="json">JSON</label>
-		</form>
-
+		
+		<input type="text" id="text" placeholder="write here" oninput="send(this.value)">
+	
 		Backend output:
 		<div id='msgs'></div>
 
 
 		<label class='file'>
-			<input type="file" data-result='file-upload' onchange='conn.file("Upload.File",this, this.dataset)'>
+			<input type="file" onchange='upload(this)'>
 			<span id='file-upload'>Upload file</span>
 		</label>
 

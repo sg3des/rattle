@@ -137,13 +137,12 @@
 				var msg = {}
 				msg.to = to
 				msg.url = window.location.href
-				msg.type = "json"
+				
 
 				if (data != undefined) {
-					msg.json = data
+					msg.data = data
+					msg.type = typeof data
 				}
-
-				if (this.debug) console.log("rattle: Send message to: " + to + " with data:", JSON.stringify(data))
 
 				//reconnect if current not connected
 				if (this.ws.readyState == 3) {
@@ -151,6 +150,8 @@
 				}
 
 				this.ws.send(JSON.stringify(msg) + "\n")
+
+				if (this.debug) console.log("rattle: Send message to: " + to + " with data:", JSON.stringify(data))
 			},
 
 			file: function (to, input, userdata) {

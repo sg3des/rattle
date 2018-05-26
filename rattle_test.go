@@ -3,7 +3,6 @@ package rattle
 import (
 	"log"
 	"net/http"
-	"reflect"
 	"testing"
 	"time"
 
@@ -11,94 +10,66 @@ import (
 )
 
 var (
-	conn *websocket.Conn
-	err  error
 	addr = "127.0.0.1:8088"
+
+	r   *Rattle
+	err error
 )
-
-// ****
-// fake controllers for tests
-type FakeController struct {
-	Name string
-	Num  int
-	Bool bool
-}
-
-func (c *FakeController) FakeMethod(r *Conn) *Message {
-	log.Println(c)
-	// fmt.Println("recieve message:", c)
-	r.NewMessage("tovoid0").Send()
-	return r.NewMessage("tovoid1")
-}
-
-func (c *FakeController) FakeEmptyMethod(r *Conn) {
-	time.Sleep(time.Second)
-}
 
 func init() {
 	Debug = true
 	log.SetFlags(log.Lshortfile)
-
-	wshandle := SetControllers(
-		&FakeController{},
-	)
-	http.Handle("/ws", wshandle)
-
-	go func() {
-		err = http.ListenAndServe(addr, nil)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	//so the server had go up
-	time.Sleep(300 * time.Millisecond)
 }
 
-// TESTS
-func TestSetControllers(t *testing.T) {
-	// controllers already set in init, just check the correctness of this
+func TestNewRattle(t *testing.T) {
+	r = NewRattle()
+	r.AddRoute("echo", echo)
+	r.AddRoute("empty", empty)
+	http.Handle("/ws", r.Handler())
 
-	if len(Controllers) != 1 {
-		t.Fatal("failed set controllers, length of Controllers map is incorrect")
-	}
+	go func() {
+		http.ListenAndServe(addr, nil)
+	}()
 
-	if conInterface, ok := Controllers["FakeController"]; ok {
-		controller := reflect.ValueOf(conInterface)
-		if !controller.IsValid() {
-			t.Error("failed set controllers, incorrect reflect of controller interface")
-		}
-		if !controller.MethodByName("FakeEmptyMethod").IsValid() {
-			t.Error("failed set controllers, required method not found")
-		}
-		if !controller.MethodByName("FakeMethod").IsValid() {
-			t.Error("failed set controllers, required method not found")
-		}
-	} else {
-		t.Error("failed set controllers, incorrect determine name of controller")
-	}
+	time.Sleep(500 * time.Millisecond)
+}
+
+func echo(r *Request) {
+	r.NewMessage("echo", r.Data)
+}
+
+func empty(r *Request) {
+
 }
 
 func TestRequest(t *testing.T) {
-	conn, err = websocket.Dial("ws://"+addr+"/ws", "", "http://"+addr)
+	conn, err := websocket.Dial("ws://"+addr+"/ws", "", "http://"+addr)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if _, err := conn.Write([]byte(`{"to":"FakeController.FakeMethod","type":"json","json":{"name":"testname"}}` + "\n")); err != nil {
-		t.Error(err)
-	}
-
-	if _, err := conn.Write([]byte(`{"to":"FakeController.FakeMethod","type":"json","json":{"num":1}}` + "\n")); err != nil {
-		t.Error(err)
-	}
-
-	if _, err := conn.Write([]byte(`{"to":"FakeController.FakeMethod","type":"json","json":{"bool":true}}` + "\n")); err != nil {
+	if _, err := conn.Write([]byte(`{"to":"echo","type":"data","data":"some data"}` + "\n")); err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(500 * time.Millisecond)
-
 }
 
 //More tests are needed
+
+//Benchmarks
+func BenchmarkRequests(b *testing.B) {
+	b.StopTimer()
+	Debug = false
+	conn, err := websocket.Dial("ws://"+addr+"/ws", "", "http://"+addr)
+	if err != nil {
+		b.Error(err)
+	}
+
+	msg := []byte([]byte(`{"to":"empty"}` + "\n"))
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		conn.Write(msg)
+	}
+}
